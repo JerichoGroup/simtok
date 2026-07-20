@@ -8,7 +8,7 @@
             }
             dictionary Perspective = {
                 double3 position = (-1.383864785509338, 3.0470284229017777, 0.7023307688547672)
-                double3 target = (0.22774294174391985, -0.1572590309354429, 0.02240903388513782)
+                double3 target = (0.22774294174392096, -0.15725903093544558, 0.022409033885137375)
             }
             dictionary Right = {
                 double3 position = (0, -500, 0)
@@ -24,7 +24,7 @@
             double agentHeight = 180
             double agentRadius = 20
             bool excludeRigidBodies = 1
-            uint64 ver = 1
+            int ver = 2
             double voxelCeiling = 460
         }
         dictionary omni_layer = {
@@ -520,7 +520,7 @@ def Xform "Root"
             prepend apiSchemas = ["NodeGraphNodeAPI"]
         )
         {
-            custom vector3d inputs:enu_reference
+            custom vector3d inputs:enu_reference = (32.12345, 35.12345, 0)
             custom uint inputs:execIn
             prepend uint inputs:execIn.connect = </Root/UDPOdomSync/on_playback_tick.outputs:tick>
             custom vector3d inputs:global_orientation

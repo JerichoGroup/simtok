@@ -2,6 +2,7 @@ out_data/
 /app
 .*
 private_test.py
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
