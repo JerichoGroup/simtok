@@ -7,8 +7,8 @@
                 double radius = 5
             }
             dictionary Perspective = {
-                double3 position = (-30.990222850726187, 15.541115547746447, 19.628856295886095)
-                double3 target = (1.0852045929446525, -0.3276985235092713, 1.1597501099111582)
+                double3 position = (-6.32367270765683, -7.296858585044664, 2.012705766022665)
+                double3 target = (-4.4054721495543605, -5.203471674744529, 1.9206551834310601)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -83,6 +83,8 @@ def Xform "World"
         prepend payload = @http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/2023.1.1/Isaac/Environments/Grid/gridroom_black.usd@
     )
     {
+        token visibility = "inherited"
+
         over "Grid_Cubes" (
             active = false
         )
@@ -91,6 +93,8 @@ def Xform "World"
 
         over "Looks"
         {
+            token visibility = "inherited"
+
             over "OmniPBR" (
                 prepend apiSchemas = ["SemanticsAPI:Semantics_sYmu", "SemanticsAPI:Semantics_orTz", "SemanticsAPI:Semantics_SImG", "SemanticsAPI:Semantics_vJTG", "SemanticsAPI:Semantics_GW1U", "SemanticsAPI:Semantics_t7QD", "SemanticsAPI:Semantics_Zjqo", "SemanticsAPI:Semantics_PkUj", "SemanticsAPI:Semantics_zJp8"]
             )
@@ -138,7 +142,18 @@ def Xform "World"
             string semantic:Semantics_pw9w:params:semanticType = "class"
             string semantic:Semantics_tEMw:params:semanticData = "staticPlaneActor"
             string semantic:Semantics_tEMw:params:semanticType = "class"
-            float3 xformOp:scale = (1, 1, 0.01)
+            token visibility = "inherited"
+            float3 xformOp:scale = (0.8, 1, 3)
+
+            over "collisionPlane"
+            {
+                token visibility = "inherited"
+            }
+        }
+
+        over "SphereLight"
+        {
+            token visibility = "invisible"
         }
     }
 }
@@ -200,14 +215,15 @@ def Xform "bboxes"
     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 
     def Mesh "Cube" (
+        delete apiSchemas = ["OmniSceneVisualizationAPI"]
         prepend apiSchemas = ["CesiumGlobeAnchorSchemaAPI", "SemanticsAPI:Semantics_65Zw", "SemanticsAPI:Semantics_wN6I", "SemanticsAPI:Semantics_8jpc", "SemanticsAPI:Semantics_hV49", "SemanticsAPI:Semantics_z942", "SemanticsAPI:Semantics_AFkr", "SemanticsAPI:Semantics_5qtV", "SemanticsAPI:Semantics_aOPp", "SemanticsAPI:Semantics_u6x5"]
     )
     {
         prepend rel cesium:anchor:georeferenceBinding = </CesiumGeoreference>
-        double cesium:anchor:height = 2.9999999996940887
-        double cesium:anchor:latitude = 32.123450000000005
+        double cesium:anchor:height = 9.313225746154785e-10
+        double cesium:anchor:latitude = 32.12345
         double cesium:anchor:longitude = 35.12344999999999
-        double3 cesium:anchor:position = (4422294.300234341, 3110745.240856421, 3372034.2291832636)
+        double3 cesium:anchor:position = (4422292.222148754, 3110743.7790824166, 3372032.6339475294)
         float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
         int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
         int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
@@ -239,10 +255,80 @@ def Xform "bboxes"
         string semantic:Semantics_z942:params:semanticData = "Cube"
         string semantic:Semantics_z942:params:semanticType = "class"
         uniform token subdivisionScheme = "none"
-        quatd xformOp:orient = (1, -9.414576742107862e-34, 1.660375726955684e-17, -7.94089066966798e-18)
-        double3 xformOp:scale = (3.0000000000000004, 3.0000000000000013, 3.000000000000001)
-        double3 xformOp:translate = (-4.656613315844253e-10, 0, 3)
+        quatd xformOp:orient = (1, 3.7007434154171895e-17, 4.299634815431455e-17, 2.1472165646159202e-17)
+        double3 xformOp:scale = (0.09999999999999999, 5.999999999999998, 5.999999999999998)
+        double3 xformOp:translate = (0, 0, 0)
         uniform token[] xformOpOrder = ["!resetXformStack!", "xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def OmniGraph "ActionGraph"
+        {
+            token evaluationMode = "Automatic"
+            token evaluator:type = "execution"
+            token fabricCacheBacking = "Shared"
+            int2 fileFormatVersion = (1, 7)
+            token pipelineStage = "pipelineStageSimulation"
+
+            def OmniGraphNode "on_playback_tick" (
+                prepend apiSchemas = ["NodeGraphNodeAPI"]
+            )
+            {
+                token node:type = "omni.graph.action.OnPlaybackTick"
+                int node:typeVersion = 1
+                custom double outputs:deltaSeconds
+                custom double outputs:frame
+                custom uint outputs:tick (
+                    customData = {
+                        bool isExecution = 1
+                    }
+                )
+                custom double outputs:time
+                uniform token ui:nodegraph:node:expansionState = "open"
+                uniform float2 ui:nodegraph:node:pos = (185.06726, 46.367043)
+            }
+
+            def OmniGraphNode "script_node" (
+                prepend apiSchemas = ["NodeGraphNodeAPI"]
+            )
+            {
+                custom uint inputs:execIn
+                prepend uint inputs:execIn.connect = </bboxes/Cube/ActionGraph/on_playback_tick.outputs:tick>
+                custom string inputs:script = """# This script is executed the first time the script node computes, or the next time
+# it computes after this script is modified or the 'Reset' button is pressed.
+#
+# The following callback functions may be defined in this script:
+#     setup(db): Called immediately after this script is executed
+#     compute(db): Called every time the node computes (should always be defined)
+#     cleanup(db): Called when the node is deleted or the reset button is pressed
+# Available variables:
+#    db: og.Database The node interface, attributes are exposed like db.inputs.foo
+#                    Use db.log_error, db.log_warning to report problems.
+#    og: The omni.graph.core module
+
+
+def setup(db: og.Database):
+    pass
+
+
+def cleanup(db: og.Database):
+    pass
+
+
+def compute(db: og.Database):
+    return True"""
+                custom token inputs:scriptPath = "../../../simulation/script_nodes/gray_scale.py"
+                custom bool inputs:usePath = 1
+                token node:type = "omni.graph.scriptnode.ScriptNode"
+                int node:typeVersion = 2
+                custom uint outputs:execOut (
+                    customData = {
+                        bool isExecution = 1
+                    }
+                )
+                custom bool state:omni_initialized
+                uniform token ui:nodegraph:node:expansionState = "open"
+                uniform float2 ui:nodegraph:node:pos = (469.4012, 40.75872)
+            }
+        }
     }
 }
 
