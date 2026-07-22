@@ -7,8 +7,8 @@
                 double radius = 5
             }
             dictionary Perspective = {
-                double3 position = (-6.32367270765683, -7.296858585044664, 2.012705766022665)
-                double3 target = (-4.4054721495543605, -5.203471674744529, 1.9206551834310601)
+                double3 position = (-7.116677607954115, -6.037956393803574, 2.2409646491268442)
+                double3 target = (-6.530599446407594, -5.593164278756463, 2.192761924350497)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -156,6 +156,26 @@ def Xform "World"
             token visibility = "invisible"
         }
     }
+
+    def Mesh "line2"
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-0.5, -0.5, 0.5), (0.5, -0.5, 0.5), (-0.5, 0.5, 0.5), (0.5, 0.5, 0.5), (-0.5, -0.5, -0.5), (0.5, -0.5, -0.5), (-0.5, 0.5, -0.5), (0.5, 0.5, -0.5)]
+        bool primvars:doNotCastShadows = 1
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1), (1, 0), (1, 1), (0, 1), (0, 0), (0, 1), (0, 0), (1, 0), (1, 1), (0, 0), (1, 0), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (1, 0), (1, 1), (0, 1), (0, 0)] (
+            interpolation = "faceVarying"
+        )
+        uniform token subdivisionScheme = "none"
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:scale = (0.1, 6, 0.25)
+        double3 xformOp:translate = (-0.02, 0, 1.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
 }
 
 def Xform "Environment"
@@ -259,40 +279,50 @@ def Xform "bboxes"
         double3 xformOp:scale = (0.09999999999999999, 5.999999999999998, 5.999999999999998)
         double3 xformOp:translate = (0, 0, 0)
         uniform token[] xformOpOrder = ["!resetXformStack!", "xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+}
 
-        def OmniGraph "ActionGraph"
-        {
-            token evaluationMode = "Automatic"
-            token evaluator:type = "execution"
-            token fabricCacheBacking = "Shared"
-            int2 fileFormatVersion = (1, 7)
-            token pipelineStage = "pipelineStageSimulation"
+def Xform "tilesets"
+{
+    quatd xformOp:orient = (1, 0, 0, 0)
+    double3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+}
 
-            def OmniGraphNode "on_playback_tick" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                token node:type = "omni.graph.action.OnPlaybackTick"
-                int node:typeVersion = 1
-                custom double outputs:deltaSeconds
-                custom double outputs:frame
-                custom uint outputs:tick (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom double outputs:time
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (185.06726, 46.367043)
+def OmniGraph "ActionGraph"
+{
+    token evaluationMode = "Automatic"
+    token evaluator:type = "execution"
+    token fabricCacheBacking = "Shared"
+    int2 fileFormatVersion = (1, 7)
+    token pipelineStage = "pipelineStageSimulation"
+
+    def OmniGraphNode "on_playback_tick" (
+        prepend apiSchemas = ["NodeGraphNodeAPI"]
+    )
+    {
+        token node:type = "omni.graph.action.OnPlaybackTick"
+        int node:typeVersion = 1
+        custom double outputs:deltaSeconds
+        custom double outputs:frame
+        custom uint outputs:tick (
+            customData = {
+                bool isExecution = 1
             }
+        )
+        custom double outputs:time
+        uniform token ui:nodegraph:node:expansionState = "open"
+        uniform float2 ui:nodegraph:node:pos = (185.06726, 46.367043)
+    }
 
-            def OmniGraphNode "script_node" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint inputs:execIn
-                prepend uint inputs:execIn.connect = </bboxes/Cube/ActionGraph/on_playback_tick.outputs:tick>
-                custom string inputs:script = """# This script is executed the first time the script node computes, or the next time
+    def OmniGraphNode "script_node" (
+        prepend apiSchemas = ["NodeGraphNodeAPI"]
+    )
+    {
+        custom uint inputs:execIn
+        prepend uint inputs:execIn.connect = </ActionGraph/on_playback_tick.outputs:tick>
+        custom string inputs:script = """# This script is executed the first time the script node computes, or the next time
 # it computes after this script is modified or the 'Reset' button is pressed.
 #
 # The following callback functions may be defined in this script:
@@ -315,28 +345,18 @@ def cleanup(db: og.Database):
 
 def compute(db: og.Database):
     return True"""
-                custom token inputs:scriptPath = "../../../simulation/script_nodes/gray_scale.py"
-                custom bool inputs:usePath = 1
-                token node:type = "omni.graph.scriptnode.ScriptNode"
-                int node:typeVersion = 2
-                custom uint outputs:execOut (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom bool state:omni_initialized
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (469.4012, 40.75872)
+        custom token inputs:scriptPath = "../../../simulation/script_nodes/gray_scale.py"
+        custom bool inputs:usePath = 1
+        token node:type = "omni.graph.scriptnode.ScriptNode"
+        int node:typeVersion = 2
+        custom uint outputs:execOut (
+            customData = {
+                bool isExecution = 1
             }
-        }
+        )
+        custom bool state:omni_initialized
+        uniform token ui:nodegraph:node:expansionState = "open"
+        uniform float2 ui:nodegraph:node:pos = (537.19073, 47.472443)
     }
-}
-
-def Xform "tilesets"
-{
-    quatd xformOp:orient = (1, 0, 0, 0)
-    double3 xformOp:scale = (1, 1, 1)
-    double3 xformOp:translate = (0, 0, 0)
-    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 }
 
