@@ -7,8 +7,8 @@
                 double radius = 5
             }
             dictionary Perspective = {
-                double3 position = (-7.116677607954115, -6.037956393803574, 2.2409646491268442)
-                double3 target = (-6.530599446407594, -5.593164278756463, 2.192761924350497)
+                double3 position = (-12.515872869853926, -7.239791552723579, 3.432373178457386)
+                double3 target = (-1.1371395029088536, -1.7132905847042519, 1.546873943947508)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -83,7 +83,7 @@ def Xform "World"
         prepend payload = @http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/2023.1.1/Isaac/Environments/Grid/gridroom_black.usd@
     )
     {
-        token visibility = "inherited"
+        token visibility = "invisible"
 
         over "Grid_Cubes" (
             active = false
@@ -173,7 +173,7 @@ def Xform "World"
         uniform token subdivisionScheme = "none"
         quatd xformOp:orient = (1, 0, 0, 0)
         double3 xformOp:scale = (0.1, 6, 0.25)
-        double3 xformOp:translate = (-0.02, 0, 1.5)
+        double3 xformOp:translate = (-0.02, 0, 0)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
     }
 }
@@ -196,9 +196,28 @@ def Xform "Environment"
         float inputs:shaping:focus
         color3f inputs:shaping:focusTint
         asset inputs:shaping:ies:file
+        token visibility = "inherited"
         quatd xformOp:orient = (0.6532814824381883, 0.2705980500730985, 0.27059805007309845, 0.6532814824381882)
         double3 xformOp:scale = (1, 1, 1)
         double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def SphereLight "SphereLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        float inputs:intensity = 4000000
+        float inputs:radius = 0.5
+        float inputs:shaping:cone:angle = 180
+        float inputs:shaping:cone:softness
+        float inputs:shaping:focus
+        color3f inputs:shaping:focusTint
+        asset inputs:shaping:ies:file
+        quatd xformOp:orient = (0.5000000000000001, 0.5, 0.49999999999999994, 0.5)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-19.900000296533108, 0, 20)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
     }
 }
@@ -240,10 +259,10 @@ def Xform "bboxes"
     )
     {
         prepend rel cesium:anchor:georeferenceBinding = </CesiumGeoreference>
-        double cesium:anchor:height = 9.313225746154785e-10
-        double cesium:anchor:latitude = 32.12345
-        double cesium:anchor:longitude = 35.12344999999999
-        double3 cesium:anchor:position = (4422292.222148754, 3110743.7790824166, 3372032.6339475294)
+        double cesium:anchor:height = 0
+        double cesium:anchor:latitude = 32.12345000000002
+        double cesium:anchor:longitude = 35.12345000000006
+        double3 cesium:anchor:position = (4422292.222148749, 3110743.7790824207, 3372032.633947531)
         float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
         int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
         int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
@@ -275,9 +294,9 @@ def Xform "bboxes"
         string semantic:Semantics_z942:params:semanticData = "Cube"
         string semantic:Semantics_z942:params:semanticType = "class"
         uniform token subdivisionScheme = "none"
-        quatd xformOp:orient = (1, 3.7007434154171895e-17, 4.299634815431455e-17, 2.1472165646159202e-17)
-        double3 xformOp:scale = (0.09999999999999999, 5.999999999999998, 5.999999999999998)
-        double3 xformOp:translate = (0, 0, 0)
+        quatd xformOp:orient = (1, -7.401486830834367e-17, -5.3244798722825745e-18, 2.5827470852845883e-17)
+        double3 xformOp:scale = (0.10000000000000002, 6.000000000000008, 3.0000000000000004)
+        double3 xformOp:translate = (6.053596712862267e-9, 2.3283064365386963e-9, 0)
         uniform token[] xformOpOrder = ["!resetXformStack!", "xformOp:translate", "xformOp:orient", "xformOp:scale"]
     }
 }
