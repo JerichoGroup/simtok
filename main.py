@@ -1,89 +1,170 @@
-from isaac_core_dev_kit.isaac_manager.host_isaac_manager import HostIsaacManager
-from isaac_core_dev_kit.udp.one_point_sender import OnePointSender
-from isaac_core_dev_kit.udp.udp_bot import UdpBot
-import isaac_core_dev_kit.dev_utils as core_utils
-from isaac_core_dev_kit.core_capture.video_capture import VideoCapture
-from isaac_core_dev_kit.core_capture.bbox_capture import BboxCapture
-from isaac_core_dev_kit.core_capture.pose_capture import PoseCapture
+from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
 from time import sleep
 
+import isaac_core_dev_kit.dev_utils as core_utils
+from isaac_core_dev_kit.core_capture.bbox_capture import BboxCapture
+from isaac_core_dev_kit.core_capture.pose_capture import PoseCapture
+from isaac_core_dev_kit.core_capture.video_capture import VideoCapture
+from isaac_core_dev_kit.isaac_manager.host_isaac_manager import HostIsaacManager
+from isaac_core_dev_kit.udp.udp_bot import UdpBot
 
-def capture_first_pov(pose_capturer: PoseCapture, bbox_capturer: BboxCapture, camera: UdpBot, video_capturer: VideoCapture) -> None:
-    """Captures a video from the first point of view (POV) of the camera."""
+# =============================================================================
+# Configuration
+# =============================================================================
 
-    camera.move_to_point(32.123269, 35.1232421, 0.0, 0.0, 0.0, 0.0, look_at_target=False)
-    camera.turn_to_point(32.12345, 35.12345, 0.0)
-    camera.move_up_down(5) #goes up 5 meters
-    sleep(0.5)  # Wait for the camera to move to the new position
-    camera.turn_pitch(-5) #turns down 10 degrees
-    sleep(2)  # Wait for the camera to move to the new position
-    
-    video_capturer.start_capture()
-    pose_capturer.start_capture()
-    bbox_capturer.start_capture()
-    sleep(60)  # Record video for 60 seconds
-    
-    bbox_capturer.stop_capture()
-    bbox_capturer.save_data_to("./data/bboxes/test_bbox_1.pkl")
+USD_PATH = "/home/user/clones/simtok/usd/maps/scenes/cube.usda"
 
-    pose_capturer.stop_capture()
-    pose_capturer.save_data_to("./data/poses/test_pose_1.pkl")
+DATA_ROOT = Path("./data")
+VIDEO_DIR = DATA_ROOT / "videos"
+POSE_DIR = DATA_ROOT / "poses"
+BBOX_DIR = DATA_ROOT / "bboxes"
 
-    video_capturer.stop_capture()
-    video_capturer.save_data_to("./data/videos/test_video_pov_1.mp4", 36)
+NUM_SAMPLES = 10
+VIDEO_DURATION_SEC = 60
+VIDEO_FPS = 36
 
+INITIAL_SCENE_LOAD_TIME_SEC = 5
+CAMERA_SETTLE_TIME_SEC = 2
+VERTICAL_MOVE_SETTLE_TIME_SEC = 0.5
 
-def capture_second_pov(pose_capturer: PoseCapture, bbox_capturer: BboxCapture, camera: UdpBot, video_capturer: VideoCapture) -> None:
-    """Captures a video from the second point of view (POV) of the camera."""
+TARGET_LAT = 32.12345
+TARGET_LON = 35.12345
+TARGET_ALT = 0.0
 
-    camera.move_to_point(32.1234500, 35.1233561, 0.0, 0.0, 0.0, 0.0, look_at_target=False)
-    camera.turn_to_point(32.12345, 35.12345, 0.0)
-    sleep(2)  # Wait for the camera to move to the new position
-    video_capturer.start_capture()
-    pose_capturer.start_capture()
-    bbox_capturer.start_capture()
-    
-    sleep(60)  # Record video for 60 seconds
-    
-    bbox_capturer.stop_capture()
-    bbox_capturer.save_data_to("./data/bboxes/test_bbox_2.pkl")
-
-    pose_capturer.stop_capture()
-    pose_capturer.save_data_to("./data/poses/test_pose_2.pkl")
-
-    video_capturer.stop_capture()
-    video_capturer.save_data_to("./data/videos/test_video_pov_2.mp4", 36)
+DEFAULT_ROLL = 0.0
+DEFAULT_PITCH = 0.0
+DEFAULT_YAW = 0.0
 
 
-def main() -> None:
-    """Main function to run the simulation and capture videos."""
+@dataclass(frozen=True)
+class PovConfig:
+    id: int
+    lat: float
+    lon: float
+    alt: float
+    move_up_m: float = 0.0
+    pitch_deg: float = 0.0
 
+
+CAMERA_POVS = (
+    PovConfig(1, 32.123269, 35.1232421, 0.0, move_up_m=5.0, pitch_deg=-5.0),
+    PovConfig(2, 32.1234500, 35.1233561, 0.0),
+)
+
+
+def create_output_directories():
+    for dir in (VIDEO_DIR, POSE_DIR, BBOX_DIR):
+        dir.mkdir(parents=True, exist_ok=True)
+
+
+def build_sample_filename_prefix(sample_id: int, pov: PovConfig) -> str:
+    return f"sample_{sample_id:03d}_pov_{pov.id}"
+
+
+def move_camera(camera: UdpBot, pov: PovConfig):
+    camera.move_to_point(
+        pov.lat, pov.lon, pov.alt,
+        DEFAULT_ROLL, DEFAULT_PITCH, DEFAULT_YAW,
+        look_at_target=False,
+    )
+
+    camera.turn_to_point(TARGET_LAT, TARGET_LON, TARGET_ALT)
+
+    if pov.move_up_m:
+        camera.move_up_down(pov.move_up_m)
+        sleep(VERTICAL_MOVE_SETTLE_TIME_SEC)
+
+    if pov.pitch_deg:
+        camera.turn_pitch(pov.pitch_deg)
+
+    sleep(CAMERA_SETTLE_TIME_SEC)
+
+
+def start_recording(video_capture: VideoCapture, pose_capture: PoseCapture, bbox_capture: BboxCapture):
+    video_capture.start_capture()
+    pose_capture.start_capture()
+    bbox_capture.start_capture()
+
+
+def stop_recording(video_capture: VideoCapture, pose_capture: PoseCapture, bbox_capture: BboxCapture):
+    bbox_capture.stop_capture()
+    pose_capture.stop_capture()
+    video_capture.stop_capture()
+
+
+def save_recording(sample_id: int, pov: PovConfig,
+                   video_capture: VideoCapture, pose_capture: PoseCapture, bbox_capture: BboxCapture):
+
+    prefix = build_sample_filename_prefix(sample_id, pov)
+
+    video_capture.save_data_to(str(VIDEO_DIR / f"{prefix}.mp4"), VIDEO_FPS)
+    pose_capture.save_data_to(str(POSE_DIR / f"{prefix}.pkl"))
+    bbox_capture.save_data_to(str(BBOX_DIR / f"{prefix}.pkl"))
+
+
+def capture_sample_from_pov(sample_id: int, pov: PovConfig,
+                   camera: UdpBot,
+                   video_capture: VideoCapture,
+                   pose_capture: PoseCapture,
+                   bbox_capture: BboxCapture):
+
+    print(f"Recording sample {sample_id + 1}/{NUM_SAMPLES} | POV {pov.id}")
+
+    move_camera(camera, pov)
+    start_recording(video_capture, pose_capture, bbox_capture)
+    sleep(VIDEO_DURATION_SEC)
+    stop_recording(video_capture, pose_capture, bbox_capture)
+    save_recording(sample_id, pov, video_capture, pose_capture, bbox_capture)
+
+
+def generate_dataset(camera, video_capture, pose_capture, bbox_capture):
+    for sample_id in range(NUM_SAMPLES):
+        print("=" * 60)
+        print(f"Generating sample {sample_id + 1}/{NUM_SAMPLES}")
+        print("=" * 60)
+        for pov in CAMERA_POVS:
+            capture_sample_from_pov(sample_id, pov, camera, video_capture, pose_capture, bbox_capture)
+
+
+def main():
+    create_output_directories()
     core_utils.safe_rclpy_init()
 
-    isaac_sim = HostIsaacManager(usd_path="/home/user/clones/simtok/usd/maps/scenes/cube.usda",
-                      com_udp=True,
-                      bbox_publisher=True,
-                      sat=True,
-                      core_path=".",
-                      show_isaac_logs=False)
-   
-    camera = UdpBot(32.12345, 35.12345, 0.0, 0.0, 0.0, 0.0)
-    video_capturer = VideoCapture()
-    bbox_capturer = BboxCapture()
-    pose_capturer = PoseCapture()
+    sim = HostIsaacManager(
+        usd_path=USD_PATH,
+        com_udp=True,
+        bbox_publisher=True,
+        sat=True,
+        core_path=".",
+        show_isaac_logs=False,
+    )
 
-    with isaac_sim:
-        sleep(5) # Wait for scene to render
+    camera = UdpBot(
+        TARGET_LAT,
+        TARGET_LON,
+        TARGET_ALT,
+        DEFAULT_ROLL,
+        DEFAULT_PITCH,
+        DEFAULT_YAW,
+    )
 
-        bbox_capturer.spin()
-        video_capturer.spin()
-        pose_capturer.spin()
-        capture_first_pov(pose_capturer, bbox_capturer, camera, video_capturer)
-        capture_second_pov(pose_capturer, bbox_capturer, camera, video_capturer)
+    video = VideoCapture()
+    pose = PoseCapture()
+    bbox = BboxCapture()
 
-    video_capturer.shutdown()
-    bbox_capturer.shutdown()
+    with sim:
+        sleep(INITIAL_SCENE_LOAD_TIME_SEC)
+        video.spin()
+        pose.spin()
+        bbox.spin()
+        generate_dataset(camera, video, pose, bbox)
+
+    video.shutdown()
+    pose.shutdown()
+    bbox.shutdown()
     core_utils.safe_rclpy_shutdown()
 
 
