@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
+import rclpy
+from std_msgs.msg import Empty
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 import isaac_core_dev_kit.dev_utils as core_utils
 from isaac_core_dev_kit.core_capture.bbox_capture import BboxCapture
@@ -21,6 +24,8 @@ DATA_ROOT = Path("./data")
 VIDEO_DIR = DATA_ROOT / "videos"
 POSE_DIR = DATA_ROOT / "poses"
 BBOX_DIR = DATA_ROOT / "bboxes"
+
+RESET_OSCILLATION_TOPIC = "/isaac_core/reset_oscillation"
 
 NUM_SAMPLES = 10
 VIDEO_DURATION_SEC = 60
@@ -120,18 +125,64 @@ def capture_sample_from_pov(sample_id: int, pov: PovConfig,
     save_recording(sample_id, pov, video_capture, pose_capture, bbox_capture)
 
 
-def generate_dataset(camera, video_capture, pose_capture, bbox_capture):
+def reset_oscillation(reset_publisher: Publisher) -> None:
+    msg = Empty()
+
+    for _ in range(2):
+        reset_publisher.publish(msg)
+        sleep(0.05)
+    sleep(0.2)
+
+
+def create_reset_publisher():
+    node = rclpy.create_node("oscillation_reset_publisher")
+
+    qos = QoSProfile(
+        reliability=ReliabilityPolicy.RELIABLE,
+        history=HistoryPolicy.KEEP_LAST,
+        depth=1,
+    )
+
+    publisher = node.create_publisher(
+        Empty,
+        RESET_OSCILLATION_TOPIC,
+        qos,
+    )
+
+    return node, publisher
+
+
+def generate_dataset(
+    camera: UdpBot,
+    video_capture: VideoCapture,
+    pose_capture: PoseCapture,
+    bbox_capture: BboxCapture,
+    reset_publisher,
+) -> None:
+
     for sample_id in range(NUM_SAMPLES):
         print("=" * 60)
         print(f"Generating sample {sample_id + 1}/{NUM_SAMPLES}")
         print("=" * 60)
-        for pov in CAMERA_POVS:
-            capture_sample_from_pov(sample_id, pov, camera, video_capture, pose_capture, bbox_capture)
 
+        reset_oscillation(reset_publisher)
+        
+        for pov in CAMERA_POVS:
+            capture_sample_from_pov(
+                sample_id,
+                pov,
+                camera,
+                video_capture,
+                pose_capture,
+                bbox_capture,
+            )
 
 def main():
+
     create_output_directories()
     core_utils.safe_rclpy_init()
+
+    reset_node, reset_publisher = create_reset_publisher()
 
     sim = HostIsaacManager(
         usd_path=USD_PATH,
@@ -160,11 +211,27 @@ def main():
         video.spin()
         pose.spin()
         bbox.spin()
-        generate_dataset(camera, video, pose, bbox)
+
+        sleep(1.0)
+
+        while reset_publisher.get_subscription_count() == 0:
+            print("Waiting for oscillation reset subscriber...")
+            sleep(0.1)
+
+
+        generate_dataset(
+            camera,
+            video,
+            pose,
+            bbox,
+            reset_publisher,
+        )
 
     video.shutdown()
     pose.shutdown()
     bbox.shutdown()
+
+    reset_node.destroy_node()
     core_utils.safe_rclpy_shutdown()
 
 
