@@ -1,12 +1,11 @@
 """This file implements a script node that subscribes to a ROS2 bbox topic,
-computes 3D distance to a target, and applies grayscale brightness
-from an oscillation file to the cube and line2 prims."""
+computes the 3D distance to a target, and applies grayscale brightness
+using an in-memory oscillation profile to the cube and line2 prims."""
 
-# ==================== imports ====================
 from __future__ import annotations
 
-import os
 import math
+from std_msgs.msg import Empty
 import random
 import rclpy
 import threading
@@ -19,7 +18,6 @@ import omni.usd
 from pxr import Gf, UsdGeom
 
 
-# ==================== consts ====================
 BBOX_TOPIC_NAME = "/isaac_core/bbox"
 TARGET_NAME = "Cube"
 CUBE_PRIM_PATH = "/bboxes/Cube"
@@ -27,14 +25,14 @@ LINE_PRIM_PATH = "/World/line2"
 
 OSCILLATION_MIN = -0.26
 OSCILLATION_MAX = 0.26
-OSCILLATION_NUM_VALUES = 400
-PROJECT_ROOT = os.getcwd()
-OSCILLATION_FILE_PATH = os.path.join(PROJECT_ROOT, "tmp", "rgb_oscillation.txt")
+OSCILLATION_NUM_VALUES_MIN = 300
+OSCILLATION_NUM_VALUES_MAX = 600
+
+RESET_OSCILLATION_TOPIC = "/isaac_core/reset_oscillation"
 
 ALPHA = 0.001  # thermal fading coefficient
 
 
-# ==================== distance calculation ====================
 def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> Optional[float]:
     """Return 3D Euclidean distance to the target bbox."""
     for bbox in msg.bboxes:
@@ -47,7 +45,6 @@ def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> 
     return None
 
 
-# ==================== thermal fading ====================
 def apply_thermal_fading(gray_value: float, distance: Optional[float], alpha: float = ALPHA) -> float:
     """Apply exponential thermal fading."""
     if distance is None:
@@ -55,36 +52,20 @@ def apply_thermal_fading(gray_value: float, distance: Optional[float], alpha: fl
     return gray_value * math.exp(-alpha * distance)
 
 
-# ==================== oscillation file creation ====================
-def create_rgb_oscillation(file_path: str = OSCILLATION_FILE_PATH,
-                           min_val: float = OSCILLATION_MIN,
-                           max_val: float = OSCILLATION_MAX,
-                           num_values: int = OSCILLATION_NUM_VALUES) -> None:
-    """Generate oscillation values and write them to a file."""
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+def generate_oscillation_values() -> list[float]:
+    num_values = random.randint(
+        OSCILLATION_NUM_VALUES_MIN,
+        OSCILLATION_NUM_VALUES_MAX,
+    )
 
-    values = [random.uniform(min_val, max_val) for _ in range(num_values)]
-    values.sort()
-    values = values + values[::-1]  # mirrored for smooth oscillation
+    values = sorted(
+        random.uniform(OSCILLATION_MIN, OSCILLATION_MAX)
+        for _ in range(num_values)
+    )
 
-    with open(file_path, "w") as f:
-        for value in values:
-            f.write(f"{value:.6f}\n")
+    return values + values[::-1]
 
 
-# ==================== oscillation file loading ====================
-def load_oscillation_values(file_path: str = OSCILLATION_FILE_PATH) -> list:
-    """Load oscillation values from file."""
-    if not os.path.exists(file_path):
-        return []
-    try:
-        with open(file_path, 'r') as f:
-            return [float(line.strip()) for line in f.readlines() if line.strip()]
-    except (IOError, ValueError):
-        return []
-
-
-# ==================== ROS2 bbox node ====================
 class ROS2BboxNode:
     """Subscribes to bbox topic and produces distance + oscillation offset."""
 
@@ -99,6 +80,14 @@ class ROS2BboxNode:
             depth=10
         )
 
+        self.control_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+
+        self.executor = MultiThreadedExecutor()
+
         try:
             self.node.declare_parameter("use_sim_time", True)
         except rclpy.exceptions.ParameterAlreadyDeclaredException:
@@ -107,42 +96,56 @@ class ROS2BboxNode:
         self.current_distance: Optional[float] = None
         self.current_offset: float = 0.0
 
-        if not os.path.exists(OSCILLATION_FILE_PATH):
-            create_rgb_oscillation()
-
-        self.oscillation_values = load_oscillation_values()
+        self.oscillation_values = generate_oscillation_values()
         self.oscillation_index = 0
 
+        self.reset_subscriber = self.node.create_subscription(
+            Empty,
+            RESET_OSCILLATION_TOPIC,
+            self.reset_callback,
+            self.control_qos,
+        )
+        
     def bbox_callback(self, msg: FrameBboxes) -> None:
-        """Update distance and oscillation offset."""
         self.current_distance = get_distance_to_target(msg, TARGET_NAME)
 
-        if self.oscillation_values:
-            self.current_offset = self.oscillation_values[
-                self.oscillation_index % len(self.oscillation_values)
-            ]
-            self.oscillation_index += 1
+        if not self.oscillation_values:
+            return
+
+        if self.oscillation_index >= len(self.oscillation_values):
+            self.oscillation_index = 0
+
+        self.current_offset = self.oscillation_values[self.oscillation_index]
+        self.oscillation_index += 1
+
+    def reset_callback(self, _: Empty) -> None:
+        """
+        Reset the oscillation values and index.
+        """
+
+        self.oscillation_values = generate_oscillation_values()
+        self.oscillation_index = 0
+        self.current_offset = 0.0
 
     def subscribe(self):
-        """Subscribe to bbox topic."""
+        """
+        Subscribe to bbox topic.
+        """
+
         if self.bbox_subscriber is None:
             self.bbox_subscriber = self.node.create_subscription(
                 FrameBboxes, BBOX_TOPIC_NAME, self.bbox_callback, self.qos_profile
             )
 
         if not self.is_spinning:
-            threading.Thread(target=spin_node, args=(self.node,), daemon=True).start()
+            threading.Thread(target=self._spin, daemon=True).start()
             self.is_spinning = True
 
-
-# ==================== spin helper ====================
-def spin_node(node: Node) -> None:
-    executor = MultiThreadedExecutor()
-    executor.add_node(node)
-    executor.spin()
+    def _spin(self) -> None:
+        self.executor.add_node(self.node)
+        self.executor.spin()
 
 
-# ==================== SRP Color Controllers ====================
 class CubeColorController:
     """Handles grayscale updates for the cube prim."""
 
@@ -153,17 +156,30 @@ class CubeColorController:
         self.base_gray = default_gray
 
     def initialize_base_gray(self, stage):
+        """
+        Initialize the base gray value from the cube prim's display color.
+        """
+
         prim = stage.GetPrimAtPath(self.prim_path)
+
         if not prim.IsValid():
             return
+
         mesh = UsdGeom.Mesh(prim)
         attr = mesh.CreateDisplayColorAttr()
         colors = attr.Get()
+
         self.base_gray = colors[0][0] if colors else self.default_gray
+
         self.initialized = True
 
     def update(self, stage, offset: float, distance: Optional[float]):
+        """
+        Update the cube prim's color based on the current offset and distance.
+        """
+
         prim = stage.GetPrimAtPath(self.prim_path)
+
         if not prim.IsValid():
             return
 
@@ -189,17 +205,30 @@ class LineColorController:
         self.base_gray = default_gray
 
     def initialize_base_gray(self, stage):
+        """
+        Initialize the base gray value from the line2 prim's display color.
+        """
+
         prim = stage.GetPrimAtPath(self.prim_path)
+
         if not prim.IsValid():
             return
+
         mesh = UsdGeom.Mesh(prim)
         attr = mesh.CreateDisplayColorAttr()
         colors = attr.Get()
+
         self.base_gray = colors[0][0] if colors else self.default_gray
+
         self.initialized = True
 
     def update(self, stage, offset: float, distance: Optional[float]):
+        """
+        Update the line2 prim's color based on the current offset and distance.
+        """
+
         prim = stage.GetPrimAtPath(self.prim_path)
+
         if not prim.IsValid():
             return
 
@@ -215,7 +244,6 @@ class LineColorController:
         attr.Set([Gf.Vec3f(gray, gray, gray)])
 
 
-# ==================== setup ====================
 def setup(db):
     if not rclpy.ok():
         try:
@@ -230,7 +258,6 @@ def setup(db):
     db.internal_state.line_controller = LineColorController(LINE_PRIM_PATH, default_gray=0.7)
 
 
-# ==================== compute ====================
 def compute(db):
     """Apply grayscale updates to cube and line2 using shared oscillation."""
 
@@ -259,7 +286,6 @@ def compute(db):
     return True
 
 
-# ==================== cleanup ====================
 def cleanup(db):
     node = getattr(db.internal_state, "ros2_bbox_node", None)
 
