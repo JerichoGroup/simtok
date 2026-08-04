@@ -324,37 +324,83 @@ class ThermalVideoPipeline:
         print(f"Done. Saved to {Config.OUTPUT_VIDEO}")
 
 
+def find_video_files(video_directory: Path) -> list[Path]:
+    """Return all video files in the dataset."""
 
-def main():
+    video_files = sorted(video_directory.glob("*.mp4"))
+
+    if not video_files:
+        raise FileNotFoundError(
+            f"No videos found in '{video_directory}'."
+        )
+
+    return video_files
+
+
+def build_output_video_path(
+    output_directory: Path,
+    input_video: Path,
+) -> Path:
+    """Return the output path for the processed video."""
+
+    return output_directory / input_video.name
+
+
+
+def process_dataset(data_root: Path) -> None:
+    """Apply thermal noise to every video in the dataset."""
+
+    video_directory = data_root / "videos"
+    output_directory = data_root / "noise_videos"
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    video_files = find_video_files(video_directory)
+
+    for video_file in video_files:
+
+        output_video = build_output_video_path(
+            output_directory,
+            video_file,
+        )
+
+        process_video(
+            video_file,
+            output_video,
+        )
+
+
+def process_video(input_video: Path, output_video: Path) -> None:
+    """Process a single video."""
+
+    Config.INPUT_VIDEO = str(input_video)
+    Config.OUTPUT_VIDEO = str(output_video)
+
+    print(f"Input : {input_video.name}")
+    print(f"Output: {output_video.name}")
+
+    ThermalVideoPipeline().run()
+
+
+
+def parse_args():
     parser = argparse.ArgumentParser(
-        description="Apply realistic thermal camera noise to a video."
+        description="Apply realistic thermal noise to every video in a dataset."
     )
 
     parser.add_argument(
-        "video",
-        type=str,
-        help="Path to the input video.",
+        "--data-root",
+        type=Path,
+        default=Path("data"),
+        help="Dataset root directory.",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    input_path = Path(args.video)
 
-    if not input_path.exists():
-        raise FileNotFoundError(f"{input_path} does not exist.")
-
-    Config.INPUT_VIDEO = str(input_path)
-
-    Config.OUTPUT_VIDEO = str(
-        input_path.with_name(
-            f"{input_path.stem}_with_noise{input_path.suffix}"
-        )
-    )
-
-    print(f"Input : {Config.INPUT_VIDEO}")
-    print(f"Output: {Config.OUTPUT_VIDEO}")
-
-    ThermalVideoPipeline().run()
+def main() -> None:
+    args = parse_args()
+    process_dataset(args.data_root)
 
 
 if __name__ == "__main__":

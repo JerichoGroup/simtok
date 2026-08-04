@@ -47,8 +47,6 @@ def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
     # Normalise yaw to [-180, 180]
     yaw = (yaw + 180) % 360 - 180
 
-    # Extract bbox target data
-    # Flip Z sign: pkl stores (target - camera), we want positive z = camera is above object
     targets: List[Dict[str, Any]] = []
     for bbox in bbox_msg.bboxes:
         dx = float(bbox.distance_x)
@@ -105,95 +103,124 @@ def build_json(pose_data: Dict[int, Any], bbox_data: Dict[int, Any]) -> Dict[str
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Combine pose and bbox pkl files into a per-frame JSON output."
+        description="Combine all pose/bbox PKL pairs into per-frame JSON files."
     )
 
     parser.add_argument(
-        "--pose-pkl",
+        "--data-root",
         type=Path,
-        required=True,
-        help="Path to the pose pickle file (GeoPoseStamped messages).",
-    )
-
-    parser.add_argument(
-        "--bbox-pkl",
-        type=Path,
-        required=True,
-        help="Path to the bbox pickle file (FrameBboxes messages).",
-    )
-
-    parser.add_argument(
-        "-o", "--output",
-        type=Path,
-        default=Path("data/jsons"),
-        help="Output path. If a directory, the JSON filename is auto-derived from the matching video in data/videos/.",
+        default=Path("data"),
+        help="Dataset root directory.",
     )
 
     return parser.parse_args()
 
 
-def find_matching_video_name(pkl_path: Path) -> str:
-    """
-    Find the matching video name from data/videos/ based on the pkl file's numeric suffix.
-    
-    e.g. test_bbox_1.pkl -> looks for a video containing '_1' like test_video_pov_1.mp4
-    Falls back to the pkl stem if no matching video is found.
-    """
-    import re
+def find_matching_bbox_file(
+    pose_file: Path,
+    bbox_directory: Path,
+) -> Path | None:
+    """Return the matching bbox PKL if it exists."""
 
-    # Extract trailing number from pkl stem (e.g. "test_bbox_1" -> "1")
-    match = re.search(r"(\d+)$", pkl_path.stem)
-    if not match:
-        return pkl_path.stem
+    bbox_file = bbox_directory / pose_file.name
 
-    suffix_num = match.group(1)
-    videos_dir = Path("data/videos")
+    if not bbox_file.exists():
+        return None
 
-    if videos_dir.is_dir():
-        # Look for a video file that ends with _<num>.mp4 (not _<num>_something.mp4)
-        pattern = re.compile(rf"^(.+)_{re.escape(suffix_num)}\.(?:mp4|avi|mkv|mov)$")
-        for video_file in sorted(videos_dir.iterdir()):
-            if video_file.is_file() and pattern.match(video_file.name):
-                return video_file.stem
-
-    # Fallback to pkl stem
-    return pkl_path.stem
+    return bbox_file
 
 
-def resolve_output_path(args) -> Path:
-    """
-    If -o is a directory, auto-name the JSON after the matching video.
-    If -o is a file path, use it directly.
-    """
-    output = args.output
+def find_pose_files(pose_directory: Path) -> List[Path]:
+    """Return all pose PKL files."""
 
-    if output.is_dir() or not output.suffix:
-        # Treat as directory — auto-derive filename from matching video
-        output.mkdir(parents=True, exist_ok=True)
-        video_name = find_matching_video_name(args.bbox_pkl)
-        return output / f"{video_name}.json"
+    pose_files = sorted(pose_directory.glob("*.pkl"))
 
-    return output
+    if not pose_files:
+        raise FileNotFoundError(
+            f"No pose PKLs found in '{pose_directory}'."
+        )
+
+    return pose_files
 
 
-def main():
-    args = parse_args()
+def write_json_file(
+    output_path: Path,
+    json_data: Dict[str, Any],
+) -> None:
+    """Write JSON data to disk."""
 
-    # Load pickle files
-    pose_data = load_pkl(args.pose_pkl)
-    bbox_data = load_pkl(args.bbox_pkl)
-
-    # Build per-frame JSON
-    result = build_json(pose_data, bbox_data)
-
-    # Write output
-    output_path = resolve_output_path(args)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open("w") as f:
-        json.dump(result, f, indent=4)
+        json.dump(json_data, f, indent=4)
 
-    print(f"[json_creation] Wrote {result['total_frames']} frames to {output_path}")
+
+def process_pkl_pair(
+    pose_file: Path,
+    bbox_file: Path,
+    output_directory: Path,
+) -> None:
+    """Convert one pose/bbox pair into a JSON file."""
+
+    pose_data = load_pkl(pose_file)
+    bbox_data = load_pkl(bbox_file)
+
+    result = build_json(pose_data, bbox_data)
+
+    output_path = output_directory / f"{pose_file.stem}.json"
+
+    write_json_file(output_path, result)
+
+    print(
+        f"[json_creation] "
+        f"Wrote {result['total_frames']} frames to {output_path}"
+    )
+
+
+def process_dataset(data_root: Path) -> None:
+    """Generate JSON files for the entire dataset."""
+
+    pose_directory = data_root / "poses"
+    bbox_directory = data_root / "bboxes"
+    json_directory = data_root / "jsons"
+
+    pose_files = find_pose_files(pose_directory)
+
+    for pose_file in pose_files:
+
+        bbox_file = find_matching_bbox_file(
+            pose_file,
+            bbox_directory,
+        )
+
+        if bbox_file is None:
+            print(f"[WARNING] Missing bbox file: {pose_file.name}")
+            continue
+
+        process_pkl_pair(
+            pose_file,
+            bbox_file,
+            json_directory,
+        )
+
+
+def find_matching_bbox_file(
+    pose_file: Path,
+    bbox_directory: Path,
+) -> Path | None:
+    """Return the matching bbox PKL if it exists."""
+
+    bbox_file = bbox_directory / pose_file.name
+
+    if not bbox_file.exists():
+        return None
+
+    return bbox_file
+
+
+def main() -> None:
+    args = parse_args()
+    process_dataset(args.data_root)
 
 
 if __name__ == "__main__":
