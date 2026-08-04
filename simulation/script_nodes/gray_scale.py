@@ -28,7 +28,8 @@ OSCILLATION_MAX = 0.26
 OSCILLATION_NUM_VALUES_MIN = 300
 OSCILLATION_NUM_VALUES_MAX = 600
 
-RESET_OSCILLATION_TOPIC = "/isaac_core/reset_oscillation"
+RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
+NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
 
 ALPHA = 0.001  # thermal fading coefficient
 
@@ -99,13 +100,21 @@ class ROS2BboxNode:
         self.oscillation_values = generate_oscillation_values()
         self.oscillation_index = 0
 
-        self.reset_subscriber = self.node.create_subscription(
+        self.restart_profile_subscriber = self.node.create_subscription(
             Empty,
             RESET_OSCILLATION_TOPIC,
-            self.reset_callback,
+            self.restart_oscillation_profile_callback,
             self.control_qos,
         )
-        
+
+        self.generate_profile_subscriber = self.node.create_subscription(
+            Empty,
+            NEW_OSCILLATION_TOPIC,
+            self.generate_new_oscillation_profile_callback,
+            self.control_qos,
+        )
+
+
     def bbox_callback(self, msg: FrameBboxes) -> None:
         self.current_distance = get_distance_to_target(msg, TARGET_NAME)
 
@@ -118,14 +127,33 @@ class ROS2BboxNode:
         self.current_offset = self.oscillation_values[self.oscillation_index]
         self.oscillation_index += 1
 
-    def reset_callback(self, _: Empty) -> None:
+
+    def restart_oscillation_profile_callback(self, _: Empty) -> None:
         """
-        Reset the oscillation values and index.
+        Restart playback from the beginning of the current oscillation profile.
+        """
+
+        self.oscillation_index = 0
+
+        if self.oscillation_values:
+            self.current_offset = self.oscillation_values[0]
+        else:
+            self.current_offset = 0.0
+
+
+    def generate_new_oscillation_profile_callback(self, _: Empty) -> None:
+        """
+        Generate a new random oscillation profile and restart playback.
         """
 
         self.oscillation_values = generate_oscillation_values()
         self.oscillation_index = 0
-        self.current_offset = 0.0
+
+        if self.oscillation_values:
+            self.current_offset = self.oscillation_values[0]
+        else:
+            self.current_offset = 0.0
+
 
     def subscribe(self):
         """
