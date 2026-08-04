@@ -8,7 +8,7 @@
             }
             dictionary Perspective = {
                 double3 position = (-11.117006829190286, -6.560380736198531, 3.2005757750209716)
-                double3 target = (-1.1371395029088553, -1.7132905847042519, 1.5468739439475085)
+                double3 target = (-1.1371395029088571, -1.7132905847042528, 1.546873943947509)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -332,7 +332,7 @@ def OmniGraph "ActionGraph"
         )
         custom double outputs:time
         uniform token ui:nodegraph:node:expansionState = "open"
-        uniform float2 ui:nodegraph:node:pos = (185.06726, 46.367043)
+        uniform float2 ui:nodegraph:node:pos = (86.447945, 121.84103)
     }
 
     def OmniGraphNode "script_node" (
@@ -376,6 +376,49 @@ def compute(db: og.Database):
         custom bool state:omni_initialized
         uniform token ui:nodegraph:node:expansionState = "open"
         uniform float2 ui:nodegraph:node:pos = (537.19073, 47.472443)
+    }
+
+    def OmniGraphNode "script_node_01" (
+        prepend apiSchemas = ["NodeGraphNodeAPI"]
+    )
+    {
+        custom uint inputs:execIn
+        prepend uint inputs:execIn.connect = </ActionGraph/on_playback_tick.outputs:tick>
+        custom string inputs:script = """# This script is executed the first time the script node computes, or the next time
+# it computes after this script is modified or the 'Reset' button is pressed.
+#
+# The following callback functions may be defined in this script:
+#     setup(db): Called immediately after this script is executed
+#     compute(db): Called every time the node computes (should always be defined)
+#     cleanup(db): Called when the node is deleted or the reset button is pressed
+# Available variables:
+#    db: og.Database The node interface, attributes are exposed like db.inputs.foo
+#                    Use db.log_error, db.log_warning to report problems.
+#    og: The omni.graph.core module
+
+
+def setup(db: og.Database):
+    pass
+
+
+def cleanup(db: og.Database):
+    pass
+
+
+def compute(db: og.Database):
+    return True"""
+        custom token inputs:scriptPath = "../../../simulation/script_nodes/zoom_node.py"
+        custom bool inputs:usePath = 1
+        token node:type = "omni.graph.scriptnode.ScriptNode"
+        int node:typeVersion = 2
+        custom uint outputs:execOut (
+            customData = {
+                bool isExecution = 1
+            }
+        )
+        custom bool state:omni_initialized
+        uniform token ui:nodegraph:node:expansionState = "open"
+        uniform float2 ui:nodegraph:node:pos = (542.5907, 238.86371)
     }
 }
 
