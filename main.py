@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import rclpy
+import re
+
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
 
-import rclpy
 from std_msgs.msg import Empty
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
@@ -15,6 +17,7 @@ from isaac_core_dev_kit.core_capture.video_capture import VideoCapture
 from isaac_core_dev_kit.isaac_manager.host_isaac_manager import HostIsaacManager
 from isaac_core_dev_kit.udp.udp_bot import UdpBot
 
+SAMPLE_PATTERN = re.compile(r"sample_(\d{3})_pov_\d+\.mp4")
 
 USD_PATH = "/home/user/clones/simtok/usd/maps/scenes/cube.usda"
 
@@ -28,7 +31,7 @@ RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
 NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
 
 
-NUM_SAMPLES = 10
+NUM_SAMPLES = 290
 VIDEO_DURATION_SEC = 60
 VIDEO_FPS = 20
 
@@ -75,6 +78,19 @@ CAMERA_POVS = (
     ),
 )
 
+
+def get_next_sample_id() -> int:
+    sample_ids = []
+
+    for video in VIDEO_DIR.glob("sample_*_pov_*.mp4"):
+        match = SAMPLE_PATTERN.match(video.name)
+        if match:
+            sample_ids.append(int(match.group(1)))
+
+    if not sample_ids:
+        return 0
+
+    return max(sample_ids) + 1
 
 def create_output_directories():
     for directory in (VIDEO_DIR, POSE_DIR, BBOX_DIR):
@@ -171,8 +187,8 @@ def capture_sample_from_pov(
 ):
 
     print(
-        f"Recording sample {sample_id + 1}/{NUM_SAMPLES} | POV {pov.id}"
-    )
+        f"Recording dataset sample {sample_id:03d} | POV {pov.id}"
+    )   
 
     move_camera(
         camera,
@@ -260,12 +276,14 @@ def generate_dataset(
     new_publisher,
 ):
 
-    for sample_id in range(NUM_SAMPLES):
+    start_sample = get_next_sample_id()
+
+    end_sample = start_sample + NUM_SAMPLES
+
+    for sample_id in range(start_sample, end_sample):
 
         print("=" * 60)
-        print(
-            f"Generating sample {sample_id + 1}/{NUM_SAMPLES}"
-        )
+        print(f"Generating dataset sample {sample_id:03d}")
         print("=" * 60)
 
 
