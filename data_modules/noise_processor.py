@@ -342,41 +342,35 @@ def build_output_video_path(
     return output_directory / input_video.name
 
 
+class NoiseProcessor:
+    """High-level API for applying thermal noise to videos."""
 
-def process_dataset(data_root: Path) -> None:
-    """Apply thermal noise to every video in the dataset."""
+    def __init__(self, data_root: Path = Path("data")):
+        self.data_root = data_root
+        self.video_directory = data_root / "videos"
+        self.output_directory = data_root / "noise_videos"
 
-    video_directory = data_root / "videos"
-    output_directory = data_root / "noise_videos"
+    def process_dataset(self) -> None:
+        """Apply thermal noise to every video in the dataset."""
+        self.output_directory.mkdir(parents=True, exist_ok=True)
+        video_files = find_video_files(self.video_directory)
 
-    output_directory.mkdir(parents=True, exist_ok=True)
+        for video_file in video_files:
+            output_video = build_output_video_path(
+                self.output_directory,
+                video_file,
+            )
+            self.process_video(video_file, output_video)
 
-    video_files = find_video_files(video_directory)
+    def process_video(self, input_video: Path, output_video: Path) -> None:
+        """Process a single video."""
+        Config.INPUT_VIDEO = str(input_video)
+        Config.OUTPUT_VIDEO = str(output_video)
 
-    for video_file in video_files:
+        print(f"Input : {input_video.name}")
+        print(f"Output: {output_video.name}")
 
-        output_video = build_output_video_path(
-            output_directory,
-            video_file,
-        )
-
-        process_video(
-            video_file,
-            output_video,
-        )
-
-
-def process_video(input_video: Path, output_video: Path) -> None:
-    """Process a single video."""
-
-    Config.INPUT_VIDEO = str(input_video)
-    Config.OUTPUT_VIDEO = str(output_video)
-
-    print(f"Input : {input_video.name}")
-    print(f"Output: {output_video.name}")
-
-    ThermalVideoPipeline().run()
-
+        ThermalVideoPipeline().run()
 
 
 def parse_args():
@@ -396,7 +390,8 @@ def parse_args():
 
 def main() -> None:
     args = parse_args()
-    process_dataset(args.data_root)
+    processor = NoiseProcessor(data_root=args.data_root)
+    processor.process_dataset()
 
 
 if __name__ == "__main__":
