@@ -5,8 +5,6 @@ from pathlib import Path
 
 class Config:
 
-    WHITE_THRESHOLD = 250
-
     GAUSSIAN_NOISE_STD = 2.0
     TEMPORAL_NOISE_STD = 1.5
     FIXED_PATTERN_STD = 2.0
