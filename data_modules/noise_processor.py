@@ -26,7 +26,7 @@ from noise_models import (
 class VideoReader:
     """Read frames from a video file."""
 
-    def __init__(self, filename):
+    def __init__(self, filename: str) -> None:
         """Open a video file for reading."""
         self.cap = cv2.VideoCapture(filename)
 
@@ -34,25 +34,25 @@ class VideoReader:
             raise RuntimeError(f"Cannot open {filename}")
 
     @property
-    def fps(self):
+    def fps(self) -> float:
         """Return the video frame rate."""
         return self.cap.get(cv2.CAP_PROP_FPS)
 
     @property
-    def width(self):
+    def width(self) -> int:
         """Return the video frame width in pixels."""
         return int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
     @property
-    def height(self):
+    def height(self) -> int:
         """Return the video frame height in pixels."""
         return int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    def read(self):
+    def read(self) -> tuple[bool, np.ndarray]:
         """Read and return the next frame from the video."""
         return self.cap.read()
 
-    def release(self):
+    def release(self) -> None:
         """Release the video capture resource."""
         self.cap.release()
 
@@ -60,7 +60,7 @@ class VideoReader:
 class VideoWriter:
     """Write frames to a video file."""
 
-    def __init__(self, filename, fps, width, height):
+    def __init__(self, filename: str, fps: float, width: int, height: int) -> None:
         """Open a video file for writing."""
         self.writer = cv2.VideoWriter(
             filename,
@@ -70,11 +70,11 @@ class VideoWriter:
             False,
         )
 
-    def write(self, frame):
+    def write(self, frame: np.ndarray) -> None:
         """Write a frame to the video file."""
         self.writer.write(frame)
 
-    def release(self):
+    def release(self) -> None:
         """Release the video writer resource."""
         self.writer.release()
 
@@ -82,11 +82,11 @@ class VideoWriter:
 class ThermalProcessor:
     """Apply multiple noise models sequentially to a frame."""
 
-    def __init__(self, noise_models: List[NoiseModel]):
+    def __init__(self, noise_models: List[NoiseModel]) -> None:
         """Initialize the thermal processor."""
         self._noise_models: List[NoiseModel] = noise_models
 
-    def process_all_noise_models(self, frame):
+    def process_all_noise_models(self, frame: np.ndarray) -> np.ndarray:
         """Process a frame using each noise model in order."""
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
 
@@ -128,7 +128,7 @@ class ThermalVideoPipeline:
 
         return models
 
-    def run(self):
+    def run(self) -> None:
         """Run noise models on each frame and write the output video."""
         reader = VideoReader(config["input_video"])
 
@@ -143,7 +143,7 @@ class ThermalVideoPipeline:
 
         processor = ThermalProcessor(noise_models)
 
-        frame_count = 0
+        frame_count: int = 0
 
         while True:
 
@@ -192,12 +192,12 @@ def build_output_video_path(
 class NoiseProcessor:
     """Provide a high-level API for applying thermal noise to videos."""
 
-    def __init__(self, data_root: Path = Path("data")):
+    def __init__(self, data_root: Path = Path("data")) -> None:
         """Initialize the processor and load configuration."""
         load_config()
-        self.data_root = data_root
-        self.video_directory = data_root / "videos"
-        self.output_directory = data_root / "noise_videos"
+        self.data_root: Path = data_root
+        self.video_directory: Path = data_root / "videos"
+        self.output_directory: Path = data_root / "noise_videos"
 
     def process_dataset(self) -> None:
         """Apply thermal noise to every video in the dataset."""
@@ -222,7 +222,7 @@ class NoiseProcessor:
         ThermalVideoPipeline().run()
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Apply realistic thermal noise to every video in a dataset."
@@ -243,8 +243,8 @@ def main() -> None:
     args = parse_args()
 
     # Load defaults from toml config for data_root fallback
-    with open(DEFAULT_CONFIG_PATH, "rb") as congif_file:
-        toml_data = tomllib.load(congif_file)
+    with open(DEFAULT_CONFIG_PATH, "rb") as config_file:
+        toml_data = tomllib.load(config_file)
 
     # CLI args override toml values
     data_root = args.data_root or Path(toml_data.get("general", {}).get("data_root", "data"))

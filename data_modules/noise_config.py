@@ -2,20 +2,21 @@
 
 import tomli as tomllib
 from pathlib import Path
+from typing import Any
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "noise_processor_config.toml"
+DEFAULT_CONFIG_PATH: Path = Path(__file__).parent / "noise_processor_config.toml"
 
-config = {}
+config: dict[str, Any] = {}
 
 
 def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> None:
     """Load configuration from a TOML file into the config dict."""
     with open(config_path, "rb") as f:
-        toml_data = tomllib.load(f)
+        toml_data: dict[str, Any] = tomllib.load(f)
 
-    noise = toml_data.get("noise", {})
-    toggles = toml_data.get("toggles", {})
-    image = toml_data.get("image", {})
+    noise: dict[str, Any] = toml_data.get("noise", {})
+    toggles: dict[str, Any] = toml_data.get("toggles", {})
+    image: dict[str, Any] = toml_data.get("image", {})
 
     config.update(noise)
     config.update(toggles)
