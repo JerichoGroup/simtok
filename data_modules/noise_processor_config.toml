@@ -1,0 +1,25 @@
+[general]
+data_root = "data"
+
+[noise]
+gaussian_noise_std = 2.0
+temporal_noise_std = 1.5
+fixed_pattern_std = 2.0
+blur_sigma = 0.8
+hot_pixel_rate = 0.00015
+dead_pixel_rate = 0.00010
+
+[toggles]
+enable_fixed_pattern = false
+enable_temporal_noise = false
+enable_gaussian_noise = true
+enable_blur = false
+enable_agc = false
+enable_low_resolution = false
+enable_sensor_drift = false
+enable_hot_pixels = false
+enable_dead_pixels = true
+
+[image]
+contrast = 1.0
+brightness = 0

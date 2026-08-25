@@ -1,34 +1,33 @@
+"""Process videos by applying configurable thermal noise models."""
+
 import cv2
 import numpy as np
 import argparse
+import tomli as tomllib
 from pathlib import Path
-from abc import ABC, abstractmethod
 from typing import List
-class Config:
 
-    GAUSSIAN_NOISE_STD = 2.0
-    TEMPORAL_NOISE_STD = 1.5
-    FIXED_PATTERN_STD = 2.0
+from noise_config import config, load_config, DEFAULT_CONFIG_PATH
 
-    BLUR_SIGMA = 0.8
-
-    HOT_PIXEL_RATE = 0.00015
-    DEAD_PIXEL_RATE = 0.00010
-
-    ENABLE_FIXED_PATTERN = True
-    ENABLE_TEMPORAL_NOISE = True
-    ENABLE_GAUSSIAN_NOISE = True
-    ENABLE_BLUR = True
-    ENABLE_AGC = False
-    ENABLE_LOW_RESOLUTION = False
-
-    CONTRAST = 1.0
-    BRIGHTNESS = 0
+from noise_models import (
+    NoiseModel,
+    ThermalBlur,
+    FixedPatternNoise,
+    GaussianNoise,
+    TemporalNoise,
+    HotPixels,
+    SensorDrift,
+    DeadPixels,
+    AGC,
+    LowResolution,
+)
 
 
 class VideoReader:
+    """Read frames from a video file."""
 
     def __init__(self, filename):
+        """Open a video file for reading."""
         self.cap = cv2.VideoCapture(filename)
 
         if not self.cap.isOpened():
@@ -36,27 +35,33 @@ class VideoReader:
 
     @property
     def fps(self):
+        """Return the video frame rate."""
         return self.cap.get(cv2.CAP_PROP_FPS)
 
     @property
     def width(self):
+        """Return the video frame width in pixels."""
         return int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
     @property
     def height(self):
+        """Return the video frame height in pixels."""
         return int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     def read(self):
+        """Read and return the next frame from the video."""
         return self.cap.read()
 
     def release(self):
+        """Release the video capture resource."""
         self.cap.release()
 
 
 class VideoWriter:
+    """Write frames to a video file."""
 
     def __init__(self, filename, fps, width, height):
-
+        """Open a video file for writing."""
         self.writer = cv2.VideoWriter(
             filename,
             cv2.VideoWriter_fourcc(*"mp4v"),
@@ -66,201 +71,29 @@ class VideoWriter:
         )
 
     def write(self, frame):
+        """Write a frame to the video file."""
         self.writer.write(frame)
 
     def release(self):
+        """Release the video writer resource."""
         self.writer.release()
 
 
-class NoiseModel(ABC):
-    """Implements an abstract noise model for images."""
-    @abstractmethod
-    def process(self, image):
-        """Process an image using the noise model."""
-        pass
-
-
-class ThermalBlur(NoiseModel):
-    """Implements a thermal blue noise model."""
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_BLUR:
-            return image
-
-        return cv2.GaussianBlur(image, (0, 0), Config.BLUR_SIGMA)
-
-
-class FixedPatternNoise(NoiseModel):
-    """Implements a fixed pattern noise model."""
-    def __init__(self, width, height):
-        """Initialize the fixed pattern noise model"""
-        column_noise = np.random.normal(0, 2, width)
-
-        row_noise = np.random.normal(0, 1, height)
-
-        pixel_noise = np.random.normal(
-            0,
-            Config.FIXED_PATTERN_STD,
-            (height, width),
-        )
-
-        self.pattern = (
-            pixel_noise
-            + column_noise[np.newaxis, :]
-            + row_noise[:, np.newaxis]
-        ).astype(np.float32)
-
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_FIXED_PATTERN:
-            return image
-
-        self.pattern += np.random.normal(
-            0,
-            0.002,
-            self.pattern.shape,
-        )
-
-        return image + self.pattern    
-
-
-class GaussianNoise(NoiseModel):
-    """Implements a Gaussian noise model."""
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_GAUSSIAN_NOISE:
-            return image
-
-        image = np.clip(image, 0, 255)
-
-        sigma = (
-            Config.GAUSSIAN_NOISE_STD
-            + (image / 255.0) * 4.0
-        )
-
-        noise = np.random.normal(
-            0,
-            sigma,
-        )
-
-        return image + noise
-
-
-class TemporalNoise(NoiseModel):
-    """Implements a temporal noise model."""
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_TEMPORAL_NOISE:
-            return image
-
-        noise = np.random.normal(
-            0,
-            Config.TEMPORAL_NOISE_STD,
-            image.shape,
-        )
-
-        return image + noise
-
-
-class HotPixels(NoiseModel):
-    """Implements a hot pixels noise model."""
-    def __init__(self, width, height):
-        """Initialize the hot pixels noise model."""
-        self.mask = (
-            np.random.rand(height, width)
-            < Config.HOT_PIXEL_RATE
-        )
-
-    def process(self, image):
-        """Process an image using the noise model."""
-        image[self.mask] += 35
-
-        return image
-
-    
-class SensorDrift(NoiseModel):
-    """"Implements a sensor drift noise model."""
-    def __init__(self):
-        """Initialize the sensor drift noise nodel."""
-        self.offset = 0.0
-
-    def process(self, image):
-        """Process an image using the noise model."""
-        self.offset += np.random.normal(0, 0.02)
-
-        return image + self.offset
-
-
-class DeadPixels(NoiseModel):
-    """Implements a dead pixedls noise model."""
-    def __init__(self, width, height):
-        """Initialize the dead pixels noise model."""
-        self.mask = (
-            np.random.rand(height, width)
-            < Config.DEAD_PIXEL_RATE
-        )
-
-    def process(self, image):
-        """Process an image using the noise model."""
-        image[self.mask] = 0
-
-        return image
-
-
-class AGC(NoiseModel):
-    """Implements a agc noise model."""
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_AGC:
-            return image
-
-        return cv2.normalize(
-            image,
-            None,
-            0,
-            255,
-            cv2.NORM_MINMAX,
-        )
-
-
-class LowResolution(NoiseModel):
-    """Implements a low resoloution noise model."""
-    def process(self, image):
-        """Process an image using the noise model."""
-        if not Config.ENABLE_LOW_RESOLUTION:
-            return image
-
-        h, w = image.shape
-
-        small = cv2.resize(
-            image,
-            (w // 2, h // 2),
-            interpolation=cv2.INTER_AREA,
-        )
-
-        return cv2.resize(
-            small,
-            (w, h),
-            interpolation=cv2.INTER_LINEAR,
-        )
-
-
 class ThermalProcessor:
-    """Implements a thermal processor that uses  multiple noise models one after another."""
+    """Apply multiple noise models sequentially to a frame."""
+
     def __init__(self, noise_models: List[NoiseModel]):
-        """Initialize the thermal processor""" 
+        """Initialize the thermal processor."""
         self._noise_models: List[NoiseModel] = noise_models
 
-
-
     def process_all_noise_models(self, frame):
-        """Process a frame using each one of the noise models one after another."""
+        """Process a frame using each noise model in order."""
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
 
         for noise_model in self._noise_models:
             image = noise_model.process(image)
 
-        image = image * Config.CONTRAST + Config.BRIGHTNESS
+        image = image * config["contrast"] + config["brightness"]
 
         image = np.clip(image, 0, 255)
 
@@ -268,33 +101,47 @@ class ThermalProcessor:
 
 
 class ThermalVideoPipeline:
-    """Implements a themal video noise addition pipeline."""
+    """Run the full thermal noise pipeline on a video."""
+
+    def _build_noise_models(self, width: int, height: int) -> List[NoiseModel]:
+        """Build the list of active noise models based on config toggles."""
+        models: List[NoiseModel] = []
+
+        if config["enable_blur"]:
+            models.append(ThermalBlur())
+        if config["enable_fixed_pattern"]:
+            models.append(FixedPatternNoise(width, height))
+        if config["enable_gaussian_noise"]:
+            models.append(GaussianNoise())
+        if config["enable_temporal_noise"]:
+            models.append(TemporalNoise())
+        if config["enable_low_resolution"]:
+            models.append(LowResolution())
+        if config["enable_agc"]:
+            models.append(AGC())
+        if config["enable_sensor_drift"]:
+            models.append(SensorDrift())
+        if config["enable_hot_pixels"]:
+            models.append(HotPixels(width, height))
+        if config["enable_dead_pixels"]:
+            models.append(DeadPixels(width, height))
+
+        return models
+
     def run(self):
-        """Run noise models on each frame of a video and paste it all together."""
-        reader = VideoReader(Config.INPUT_VIDEO)
+        """Run noise models on each frame and write the output video."""
+        reader = VideoReader(config["input_video"])
 
         writer = VideoWriter(
-            Config.OUTPUT_VIDEO,
+            config["output_video"],
             reader.fps,
             reader.width,
             reader.height,
         )
 
-        noise_models: List[NoiseModel] = [
-        ThermalBlur(),
-        FixedPatternNoise(reader.width, reader.height),
-        GaussianNoise(),
-        TemporalNoise(),
-        LowResolution(),
-        AGC(),
-        SensorDrift(),
-        HotPixels(reader.width, reader.height),
-        DeadPixels(reader.width, reader.height),
-        ]
+        noise_models = self._build_noise_models(reader.width, reader.height)
 
-        processor = ThermalProcessor(
-            noise_models
-        )
+        processor = ThermalProcessor(noise_models)
 
         frame_count = 0
 
@@ -317,7 +164,7 @@ class ThermalVideoPipeline:
         reader.release()
         writer.release()
 
-        print(f"Done. Saved to {Config.OUTPUT_VIDEO}")
+        print(f"Done. Saved to {config['output_video']}")
 
 
 def find_video_files(video_directory: Path) -> list[Path]:
@@ -343,9 +190,11 @@ def build_output_video_path(
 
 
 class NoiseProcessor:
-    """High-level API for applying thermal noise to videos."""
+    """Provide a high-level API for applying thermal noise to videos."""
 
     def __init__(self, data_root: Path = Path("data")):
+        """Initialize the processor and load configuration."""
+        load_config()
         self.data_root = data_root
         self.video_directory = data_root / "videos"
         self.output_directory = data_root / "noise_videos"
@@ -363,9 +212,9 @@ class NoiseProcessor:
             self.process_video(video_file, output_video)
 
     def process_video(self, input_video: Path, output_video: Path) -> None:
-        """Process a single video."""
-        Config.INPUT_VIDEO = str(input_video)
-        Config.OUTPUT_VIDEO = str(output_video)
+        """Process a single video with thermal noise."""
+        config["input_video"] = str(input_video)
+        config["output_video"] = str(output_video)
 
         print(f"Input : {input_video.name}")
         print(f"Output: {output_video.name}")
@@ -374,6 +223,7 @@ class NoiseProcessor:
 
 
 def parse_args():
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Apply realistic thermal noise to every video in a dataset."
     )
@@ -381,16 +231,25 @@ def parse_args():
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path("data"),
-        help="Dataset root directory.",
+        default=None,
+        help="Dataset root directory (overrides config file).",
     )
 
     return parser.parse_args()
 
 
 def main() -> None:
+    """Run the noise processor from the command line."""
     args = parse_args()
-    processor = NoiseProcessor(data_root=args.data_root)
+
+    # Load defaults from toml config for data_root fallback
+    with open(DEFAULT_CONFIG_PATH, "rb") as congif_file:
+        toml_data = tomllib.load(congif_file)
+
+    # CLI args override toml values
+    data_root = args.data_root or Path(toml_data.get("general", {}).get("data_root", "data"))
+
+    processor = NoiseProcessor(data_root=data_root)
     processor.process_dataset()
 
 
