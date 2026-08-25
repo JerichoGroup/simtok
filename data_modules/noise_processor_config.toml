@@ -15,9 +15,9 @@ enable_temporal_noise = false
 enable_gaussian_noise = true
 enable_blur = false
 enable_agc = false
-enable_low_resolution = false
-enable_sensor_drift = false
-enable_hot_pixels = false
+enable_low_resolution = true
+enable_sensor_drift = true
+enable_hot_pixels = true
 enable_dead_pixels = true
 
 [image]

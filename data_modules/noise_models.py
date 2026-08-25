@@ -101,9 +101,10 @@ class HotPixels(NoiseModel):
 
     def process(self, image):
         """Apply the noise effect to an image."""
-        image[self.mask] += 35
+        result = image.copy()
+        result[self.mask] += 35
 
-        return image
+        return result
 
 
 class SensorDrift(NoiseModel):
@@ -132,9 +133,10 @@ class DeadPixels(NoiseModel):
 
     def process(self, image):
         """Apply the noise effect to an image."""
-        image[self.mask] = 0
+        result = image.copy()
+        result[self.mask] = 0
 
-        return image
+        return result
 
 
 class AGC(NoiseModel):
