@@ -73,15 +73,17 @@ class VideoWriter:
 
 
 class NoiseModel(ABC):
+    """Implements an abstract noise model for images."""
     @abstractmethod
     def process(self, image):
+        """Process an image using the noise model."""
         pass
 
 
 class ThermalBlur(NoiseModel):
-
+    """Implements a thermal blue noise model."""
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_BLUR:
             return image
 
@@ -89,9 +91,9 @@ class ThermalBlur(NoiseModel):
 
 
 class FixedPatternNoise(NoiseModel):
-
+    """Implements a fixed pattern noise model."""
     def __init__(self, width, height):
-
+        """Initialize the fixed pattern noise model"""
         column_noise = np.random.normal(0, 2, width)
 
         row_noise = np.random.normal(0, 1, height)
@@ -109,7 +111,7 @@ class FixedPatternNoise(NoiseModel):
         ).astype(np.float32)
 
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_FIXED_PATTERN:
             return image
 
@@ -123,9 +125,9 @@ class FixedPatternNoise(NoiseModel):
 
 
 class GaussianNoise(NoiseModel):
-
+    """Implements a Gaussian noise model."""
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_GAUSSIAN_NOISE:
             return image
 
@@ -145,9 +147,9 @@ class GaussianNoise(NoiseModel):
 
 
 class TemporalNoise(NoiseModel):
-
+    """Implements a temporal noise model."""
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_TEMPORAL_NOISE:
             return image
 
@@ -161,54 +163,54 @@ class TemporalNoise(NoiseModel):
 
 
 class HotPixels(NoiseModel):
-
+    """Implements a hot pixels noise model."""
     def __init__(self, width, height):
-
+        """Initialize the hot pixels noise model."""
         self.mask = (
             np.random.rand(height, width)
             < Config.HOT_PIXEL_RATE
         )
 
     def process(self, image):
-
+        """Process an image using the noise model."""
         image[self.mask] += 35
 
         return image
 
     
 class SensorDrift(NoiseModel):
-
+    """"Implements a sensor drift noise model."""
     def __init__(self):
-
+        """Initialize the sensor drift noise nodel."""
         self.offset = 0.0
 
     def process(self, image):
-
+        """Process an image using the noise model."""
         self.offset += np.random.normal(0, 0.02)
 
         return image + self.offset
 
 
 class DeadPixels(NoiseModel):
-
+    """Implements a dead pixedls noise model."""
     def __init__(self, width, height):
-
+        """Initialize the dead pixels noise model."""
         self.mask = (
             np.random.rand(height, width)
             < Config.DEAD_PIXEL_RATE
         )
 
     def process(self, image):
-
+        """Process an image using the noise model."""
         image[self.mask] = 0
 
         return image
 
 
 class AGC(NoiseModel):
-
+    """Implements a agc noise model."""
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_AGC:
             return image
 
@@ -222,9 +224,9 @@ class AGC(NoiseModel):
 
 
 class LowResolution(NoiseModel):
-
+    """Implements a low resoloution noise model."""
     def process(self, image):
-
+        """Process an image using the noise model."""
         if not Config.ENABLE_LOW_RESOLUTION:
             return image
 
@@ -244,15 +246,15 @@ class LowResolution(NoiseModel):
 
 
 class ThermalProcessor:
-
+    """Implements a thermal processor that uses  multiple noise models one after another."""
     def __init__(self, noise_models: List[NoiseModel]):
-
+        """Initialize the thermal processor""" 
         self._noise_models: List[NoiseModel] = noise_models
 
 
 
     def process_all_noise_models(self, frame):
-        """Process a frame using each one of the noise models"""
+        """Process a frame using each one of the noise models one after another."""
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
 
         for noise_model in self._noise_models:
@@ -266,9 +268,9 @@ class ThermalProcessor:
 
 
 class ThermalVideoPipeline:
-
+    """Implements a themal video noise addition pipeline."""
     def run(self):
-
+        """Run noise models on each frame of a video and paste it all together."""
         reader = VideoReader(Config.INPUT_VIDEO)
 
         writer = VideoWriter(
