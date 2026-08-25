@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import argparse
 from pathlib import Path
-
+from abc import ABC, abstractmethod
+from typing import List
 class Config:
 
     GAUSSIAN_NOISE_STD = 2.0
@@ -71,7 +72,13 @@ class VideoWriter:
         self.writer.release()
 
 
-class ThermalBlur:
+class NoiseModel(ABC):
+    @abstractmethod
+    def process(self, image):
+        pass
+
+
+class ThermalBlur(NoiseModel):
 
     def process(self, image):
 
@@ -81,7 +88,7 @@ class ThermalBlur:
         return cv2.GaussianBlur(image, (0, 0), Config.BLUR_SIGMA)
 
 
-class FixedPatternNoise:
+class FixedPatternNoise(NoiseModel):
 
     def __init__(self, width, height):
 
@@ -115,7 +122,7 @@ class FixedPatternNoise:
         return image + self.pattern    
 
 
-class GaussianNoise:
+class GaussianNoise(NoiseModel):
 
     def process(self, image):
 
@@ -137,7 +144,7 @@ class GaussianNoise:
         return image + noise
 
 
-class TemporalNoise:
+class TemporalNoise(NoiseModel):
 
     def process(self, image):
 
@@ -153,7 +160,7 @@ class TemporalNoise:
         return image + noise
 
 
-class HotPixels:
+class HotPixels(NoiseModel):
 
     def __init__(self, width, height):
 
@@ -169,7 +176,7 @@ class HotPixels:
         return image
 
     
-class SensorDrift:
+class SensorDrift(NoiseModel):
 
     def __init__(self):
 
@@ -182,7 +189,7 @@ class SensorDrift:
         return image + self.offset
 
 
-class DeadPixels:
+class DeadPixels(NoiseModel):
 
     def __init__(self, width, height):
 
@@ -198,7 +205,7 @@ class DeadPixels:
         return image
 
 
-class AGC:
+class AGC(NoiseModel):
 
     def process(self, image):
 
@@ -214,7 +221,7 @@ class AGC:
         )
 
 
-class LowResolution:
+class LowResolution(NoiseModel):
 
     def process(self, image):
 
@@ -238,40 +245,18 @@ class LowResolution:
 
 class ThermalProcessor:
 
-    def __init__(self, width, height):
+    def __init__(self, noise_models: List[NoiseModel]):
 
-        self.blur = ThermalBlur()
-        self.fixed = FixedPatternNoise(width, height)
-        self.gaussian = GaussianNoise()
-        self.temporal = TemporalNoise()
-        self.lowres = LowResolution()
-        self.agc = AGC()
-        self.drift = SensorDrift()
-        self.hot = HotPixels(width, height)
-        self.dead = DeadPixels(width, height)
+        self._noise_models: List[NoiseModel] = noise_models
 
-        
 
-    def process(self, frame):
+
+    def process_all_noise_models(self, frame):
+        """Process a frame using each one of the noise models"""
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
 
-        # image = self.blur.process(image)
-
-        # image = self.fixed.process(image)
-
-        image = self.gaussian.process(image)
-
-        # image = self.temporal.process(image)
-
-        # image = self.lowres.process(image)
-
-        # image = self.agc.process(image)
-
-        # image = self.drift.process(image)
-
-        # image = self.hot.process(image)
-
-        # image = self.dead.process(image)
+        for noise_model in self._noise_models:
+            image = noise_model.process(image)
 
         image = image * Config.CONTRAST + Config.BRIGHTNESS
 
@@ -293,9 +278,20 @@ class ThermalVideoPipeline:
             reader.height,
         )
 
+        noise_models: List[NoiseModel] = [
+        ThermalBlur(),
+        FixedPatternNoise(reader.width, reader.height),
+        GaussianNoise(),
+        TemporalNoise(),
+        LowResolution(),
+        AGC(),
+        SensorDrift(),
+        HotPixels(reader.width, reader.height),
+        DeadPixels(reader.width, reader.height),
+        ]
+
         processor = ThermalProcessor(
-            reader.width,
-            reader.height,
+            noise_models
         )
 
         frame_count = 0
@@ -307,7 +303,7 @@ class ThermalVideoPipeline:
             if not ret:
                 break
 
-            output = processor.process(frame)
+            output = processor.process_all_noise_models(frame)
 
             writer.write(output)
 
