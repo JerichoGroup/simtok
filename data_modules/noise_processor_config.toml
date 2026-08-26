@@ -1,5 +1,6 @@
 [general]
-data_root = "data"
+input_video_dir = "data/videos"
+output_video_dir = "data/noise_videos"
 
 [noise]
 gaussian_noise_std = 2.0

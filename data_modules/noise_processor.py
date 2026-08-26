@@ -190,12 +190,15 @@ def build_output_video_path(
 class NoiseProcessor:
     """Provide a high-level API for applying thermal noise to videos."""
 
-    def __init__(self, data_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        input_video_dir: Path | None = None,
+        output_video_dir: Path | None = None,
+    ) -> None:
         """Initialize the processor and load configuration."""
         load_config()
-        self.data_root: Path = data_root or Path(config["data_root"])
-        self.video_directory: Path = self.data_root / "videos"
-        self.output_directory: Path = self.data_root / "noise_videos"
+        self.video_directory: Path = input_video_dir or Path(config["input_video_dir"])
+        self.output_directory: Path = output_video_dir or Path(config["output_video_dir"])
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
@@ -225,10 +228,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--data-root",
+        "--input-video-dir",
         type=Path,
         default=None,
-        help="Dataset root directory (overrides config file).",
+        help="Directory containing input videos (overrides config file).",
+    )
+
+    parser.add_argument(
+        "--output-video-dir",
+        type=Path,
+        default=None,
+        help="Directory to write processed videos (overrides config file).",
     )
 
     return parser.parse_args()
@@ -238,7 +248,10 @@ def main() -> None:
     """Run the noise processor from the command line."""
     args = parse_args()
 
-    processor = NoiseProcessor(data_root=args.data_root)
+    processor = NoiseProcessor(
+        input_video_dir=args.input_video_dir,
+        output_video_dir=args.output_video_dir,
+    )
     processor.process_dataset()
 
 
