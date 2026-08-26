@@ -1,0 +1,81 @@
+# =============================================================================
+# SimTok Unified Configuration
+# =============================================================================
+
+[paths]
+data_root = "data"
+video_dir = "data/videos"
+pose_dir = "data/poses"
+bbox_dir = "data/bboxes"
+json_dir = "data/jsons"
+noise_video_dir = "data/noise_videos"
+usd_path = "usd/maps/scenes/cube.usda"
+
+# =============================================================================
+# Data Collection (collect)
+# =============================================================================
+
+[collect]
+num_samples = 1
+video_duration_sec = 2
+video_fps = 20
+initial_scene_load_time_sec = 5
+camera_settle_time_sec = 2
+vertical_move_settle_time_sec = 0.5
+
+[collect.target]
+lat = 32.12345
+lon = 35.12345
+alt = 0.0
+roll = 0.0
+pitch = 0.0
+yaw = 0.0
+
+[[collect.povs]]
+id = 1
+lat = 32.123269
+lon = 35.1232421
+alt = 0.0
+move_up_m = 5.0
+pitch_deg = -5.0
+
+[[collect.povs]]
+id = 2
+lat = 32.1234500
+lon = 35.1233561
+alt = 0.0
+move_up_m = 0.0
+pitch_deg = 0.0
+
+# =============================================================================
+# Noise Processor
+# =============================================================================
+
+[noise]
+gaussian_noise_std = 2.0
+gaussian_noise_signal_multiplier = 4.0
+temporal_noise_std = 1.5
+fixed_pattern_std = 2.0
+fixed_pattern_column_std = 2.0
+fixed_pattern_row_std = 1.0
+fixed_pattern_drift_std = 0.002
+blur_sigma = 0.8
+hot_pixel_rate = 0.00015
+hot_pixel_intensity = 35.0
+dead_pixel_rate = 0.00010
+sensor_drift_std = 0.02
+
+[noise.toggles]
+enable_fixed_pattern = false
+enable_temporal_noise = false
+enable_gaussian_noise = true
+enable_blur = false
+enable_agc = false
+enable_low_resolution = true
+enable_sensor_drift = true
+enable_hot_pixels = true
+enable_dead_pixels = true
+
+[noise.image]
+contrast = 1.0
+brightness = 0

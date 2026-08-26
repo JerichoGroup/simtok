@@ -1,14 +1,15 @@
 """Process videos by applying configurable thermal noise models."""
 
+from __future__ import annotations
+
 import cv2
 import numpy as np
-import argparse
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from noise_config import config, load_config
+from data_modules.noise_config import config, load_config
 
-from noise_models import (
+from data_modules.noise_models import (
     NoiseModel,
     ThermalBlur,
     FixedPatternNoise,
@@ -188,17 +189,21 @@ def build_output_video_path(
 
 
 class NoiseProcessor:
-    """Provide a high-level API for applying thermal noise to videos."""
+    """Provide a high-level API for applying thermal noise to videos.
+
+    Resolves parameters using the priority: constructor arg > TOML config.
+    If a constructor argument is None, the value is read from the shared TOML.
+    """
 
     def __init__(
         self,
-        input_video_dir: Path | None = None,
-        output_video_dir: Path | None = None,
+        input_video_dir: Optional[Path] = None,
+        output_video_dir: Optional[Path] = None,
     ) -> None:
-        """Initialize the processor and load configuration."""
+        """Initialize the processor and load configuration from shared TOML."""
         load_config()
-        self.video_directory: Path = input_video_dir or Path(config["input_video_dir"])
-        self.output_directory: Path = output_video_dir or Path(config["output_video_dir"])
+        self.video_directory: Path = input_video_dir if input_video_dir is not None else Path(config["input_video_dir"])
+        self.output_directory: Path = output_video_dir if output_video_dir is not None else Path(config["output_video_dir"])
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
@@ -219,41 +224,3 @@ class NoiseProcessor:
         print(f"Output: {output_video.name}")
 
         self._pipeline.run(str(input_video), str(output_video))
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Apply realistic thermal noise to every video in a dataset."
-    )
-
-    parser.add_argument(
-        "--input-video-dir",
-        type=Path,
-        default=None,
-        help="Directory containing input videos (overrides config file).",
-    )
-
-    parser.add_argument(
-        "--output-video-dir",
-        type=Path,
-        default=None,
-        help="Directory to write processed videos (overrides config file).",
-    )
-
-    return parser.parse_args()
-
-
-def main() -> None:
-    """Run the noise processor from the command line."""
-    args = parse_args()
-
-    processor = NoiseProcessor(
-        input_video_dir=args.input_video_dir,
-        output_video_dir=args.output_video_dir,
-    )
-    processor.process_dataset()
-
-
-if __name__ == "__main__":
-    main()
