@@ -8,27 +8,27 @@ from data_modules.noise_config import config
 
 
 class NoiseModel(ABC):
-    """Provide an abstract interface for image noise models."""
+    """Define the abstract interface for all noise models."""
 
     @abstractmethod
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Apply the noise effect to an image and return the result."""
         pass
 
 
 class ThermalBlur(NoiseModel):
-    """Apply Gaussian blur to simulate thermal diffusion."""
+    """Simulate thermal diffusion via Gaussian blur."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Apply Gaussian blur to the image."""
         return cv2.GaussianBlur(image, (0, 0), config["blur_sigma"])
 
 
 class FixedPatternNoise(NoiseModel):
-    """Apply fixed pattern noise with column, row, and pixel components."""
+    """Simulate sensor fixed-pattern noise with column, row, and pixel components."""
 
     def __init__(self, width: int, height: int) -> None:
-        """Initialize the fixed pattern noise model."""
+        """Generate the fixed noise pattern for the given frame dimensions."""
         column_noise = np.random.normal(0, config["fixed_pattern_column_std"], width)
         row_noise = np.random.normal(0, config["fixed_pattern_row_std"], height)
 
@@ -45,7 +45,7 @@ class FixedPatternNoise(NoiseModel):
         ).astype(np.float32)
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Add the drifting fixed pattern to the image."""
         self.pattern += np.random.normal(
             0,
             config["fixed_pattern_drift_std"],
@@ -56,10 +56,10 @@ class FixedPatternNoise(NoiseModel):
 
 
 class GaussianNoise(NoiseModel):
-    """Apply signal-dependent Gaussian noise."""
+    """Simulate signal-dependent Gaussian read noise."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Add signal-dependent Gaussian noise to the image."""
         image = np.clip(image, 0, 255)
 
         sigma = (
@@ -67,19 +67,16 @@ class GaussianNoise(NoiseModel):
             + (image / 255.0) * config["gaussian_noise_signal_multiplier"]
         )
 
-        noise = np.random.normal(
-            0,
-            sigma,
-        )
+        noise = np.random.normal(0, sigma)
 
         return image + noise
 
 
 class TemporalNoise(NoiseModel):
-    """Apply frame-to-frame temporal noise."""
+    """Simulate frame-to-frame temporal noise."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Add random temporal noise to the image."""
         noise = np.random.normal(
             0,
             config["temporal_noise_std"],
@@ -90,17 +87,17 @@ class TemporalNoise(NoiseModel):
 
 
 class HotPixels(NoiseModel):
-    """Simulate hot pixels with fixed bright spots."""
+    """Simulate stuck-high hot pixels on the sensor."""
 
     def __init__(self, width: int, height: int) -> None:
-        """Initialize the hot pixels noise model."""
+        """Generate a random hot pixel mask for the given frame dimensions."""
         self.mask: np.ndarray = (
             np.random.rand(height, width)
             < config["hot_pixel_rate"]
         )
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Add hot pixel intensity at masked locations."""
         result = image.copy()
         result[self.mask] += config["hot_pixel_intensity"]
 
@@ -111,28 +108,28 @@ class SensorDrift(NoiseModel):
     """Simulate slow sensor baseline drift over time."""
 
     def __init__(self) -> None:
-        """Initialize the sensor drift noise model."""
+        """Initialize the cumulative drift offset to zero."""
         self.offset: float = 0.0
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Apply cumulative drift offset to the image."""
         self.offset += np.random.normal(0, config["sensor_drift_std"])
 
         return image + self.offset
 
 
 class DeadPixels(NoiseModel):
-    """Simulate dead pixels with fixed dark spots."""
+    """Simulate stuck-low dead pixels on the sensor."""
 
     def __init__(self, width: int, height: int) -> None:
-        """Initialize the dead pixels noise model."""
+        """Generate a random dead pixel mask for the given frame dimensions."""
         self.mask: np.ndarray = (
             np.random.rand(height, width)
             < config["dead_pixel_rate"]
         )
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Zero out pixel values at masked locations."""
         result = image.copy()
         result[self.mask] = 0
 
@@ -140,10 +137,10 @@ class DeadPixels(NoiseModel):
 
 
 class AGC(NoiseModel):
-    """Apply automatic gain control via histogram normalization."""
+    """Simulate automatic gain control via histogram normalization."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Normalize the image histogram to the full 0-255 range."""
         return cv2.normalize(
             image,
             None,
@@ -154,10 +151,10 @@ class AGC(NoiseModel):
 
 
 class LowResolution(NoiseModel):
-    """Simulate low resolution via downsample and upsample."""
+    """Simulate low sensor resolution via downsample and upsample."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image."""
+        """Downsample the image by half and upsample back to original size."""
         h, w = image.shape
 
         small = cv2.resize(

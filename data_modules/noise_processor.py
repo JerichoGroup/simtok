@@ -1,4 +1,4 @@
-"""Process videos by applying configurable thermal noise models."""
+"""Apply configurable thermal noise models to simulation videos."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from data_modules.noise_models import (
 
 
 class VideoReader:
-    """Read frames from a video file."""
+    """Read frames sequentially from a video file."""
 
     def __init__(self, filename: str) -> None:
         """Open a video file for reading."""
@@ -49,7 +49,7 @@ class VideoReader:
         return int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     def read(self) -> tuple[bool, np.ndarray]:
-        """Read and return the next frame from the video."""
+        """Read the next frame from the video."""
         return self.cap.read()
 
     def release(self) -> None:
@@ -58,7 +58,7 @@ class VideoReader:
 
 
 class VideoWriter:
-    """Write frames to a video file."""
+    """Write grayscale frames to a video file."""
 
     def __init__(self, filename: str, fps: float, width: int, height: int) -> None:
         """Open a video file for writing."""
@@ -71,7 +71,7 @@ class VideoWriter:
         )
 
     def write(self, frame: np.ndarray) -> None:
-        """Write a frame to the video file."""
+        """Write a single frame to the video file."""
         self.writer.write(frame)
 
     def release(self) -> None:
@@ -80,28 +80,27 @@ class VideoWriter:
 
 
 class ThermalProcessor:
-    """Apply multiple noise models sequentially to a frame."""
+    """Apply a sequence of noise models to produce a thermal frame."""
 
     def __init__(self, noise_models: List[NoiseModel]) -> None:
-        """Initialize the thermal processor."""
+        """Initialize the processor with an ordered list of noise models."""
         self._noise_models: List[NoiseModel] = noise_models
 
     def process_all_noise_models(self, frame: np.ndarray) -> np.ndarray:
-        """Process a frame using each noise model in order."""
+        """Convert a BGR frame to grayscale and apply all noise models."""
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
 
         for noise_model in self._noise_models:
             image = noise_model.process(image)
 
         image = image * config["contrast"] + config["brightness"]
-
         image = np.clip(image, 0, 255)
 
         return image.astype(np.uint8)
 
 
 class ThermalVideoPipeline:
-    """Run the full thermal noise pipeline on a video."""
+    """Process an entire video through the thermal noise pipeline."""
 
     def _build_noise_models(self, width: int, height: int) -> List[NoiseModel]:
         """Build the list of active noise models based on config toggles."""
@@ -129,7 +128,7 @@ class ThermalVideoPipeline:
         return models
 
     def run(self, input_video: str, output_video: str) -> None:
-        """Run noise models on each frame and write the output video."""
+        """Process all frames from input and write the noised output."""
         reader = VideoReader(input_video)
 
         writer = VideoWriter(
@@ -145,16 +144,13 @@ class ThermalVideoPipeline:
         frame_count: int = 0
 
         while True:
-
             ret, frame = reader.read()
 
             if not ret:
                 break
 
             output = processor.process_all_noise_models(frame)
-
             writer.write(output)
-
             frame_count += 1
 
             if frame_count % 100 == 0:
@@ -167,8 +163,7 @@ class ThermalVideoPipeline:
 
 
 def find_video_files(video_directory: Path) -> list[Path]:
-    """Return all video files in the dataset."""
-
+    """Return all mp4 files sorted from the given directory."""
     video_files = sorted(video_directory.glob("*.mp4"))
 
     if not video_files:
@@ -179,35 +174,27 @@ def find_video_files(video_directory: Path) -> list[Path]:
     return video_files
 
 
-def build_output_video_path(
-    output_directory: Path,
-    input_video: Path,
-) -> Path:
-    """Return the output path for the processed video."""
-
+def build_output_video_path(output_directory: Path, input_video: Path) -> Path:
+    """Build the output path by placing the input filename in the output directory."""
     return output_directory / input_video.name
 
 
 class NoiseProcessor:
-    """Provide a high-level API for applying thermal noise to videos.
-
-    Resolves parameters using the priority: constructor arg > TOML config.
-    If a constructor argument is None, the value is read from the shared TOML.
-    """
+    """Apply thermal noise to all videos in a dataset directory."""
 
     def __init__(
         self,
         input_video_dir: Optional[Path] = None,
         output_video_dir: Optional[Path] = None,
     ) -> None:
-        """Initialize the processor and load configuration from shared TOML."""
+        """Initialize the processor, prioritizing explicit args over TOML config."""
         load_config()
         self.video_directory: Path = input_video_dir if input_video_dir is not None else Path(config["input_video_dir"])
         self.output_directory: Path = output_video_dir if output_video_dir is not None else Path(config["output_video_dir"])
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
-        """Apply thermal noise to every video in the dataset."""
+        """Apply thermal noise to every video in the input directory."""
         self.output_directory.mkdir(parents=True, exist_ok=True)
         video_files = find_video_files(self.video_directory)
 
@@ -219,7 +206,7 @@ class NoiseProcessor:
             self.process_video(video_file, output_video)
 
     def process_video(self, input_video: Path, output_video: Path) -> None:
-        """Process a single video with thermal noise."""
+        """Process a single video file with thermal noise."""
         print(f"Input : {input_video.name}")
         print(f"Output: {output_video.name}")
 

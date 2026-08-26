@@ -1,8 +1,4 @@
-"""Data collection orchestrator for SimTok.
-
-Launches Isaac Sim, moves the camera through configured POVs,
-and records video, pose, and bounding-box data for each sample.
-"""
+"""Orchestrate data collection from Isaac Sim for the SimTok pipeline."""
 
 from __future__ import annotations
 
@@ -31,7 +27,7 @@ SAMPLE_PATTERN = re.compile(r"sample_(\d{3})_pov_\d+\.mp4")
 
 @dataclass(frozen=True)
 class PovConfig:
-    """A single camera point-of-view configuration."""
+    """Store a single camera point-of-view configuration."""
 
     id: int
     lat: float
@@ -42,11 +38,7 @@ class PovConfig:
 
 
 class DataCollector:
-    """Orchestrate data collection from Isaac Sim.
-
-    Resolves parameters using the priority: constructor arg > TOML config.
-    If a constructor argument is None, the value is read from the TOML.
-    """
+    """Collect simulation data by recording video, pose, and bbox from Isaac Sim."""
 
     def __init__(
         self,
@@ -58,13 +50,12 @@ class DataCollector:
         usd_path: Optional[str] = None,
         povs: Optional[list[PovConfig]] = None,
     ) -> None:
-        """Initialize the collector, resolving args vs TOML config."""
-        cfg = get_config()
-        paths = cfg.paths
-        collect = cfg.collect
-        target = cfg.collect_target
+        """Initialize the collector, prioritizing explicit args over TOML config."""
+        config = get_config()
+        paths = config.paths
+        collect = config.collect
+        target = config.collect_target
 
-        # Resolve each parameter: explicit arg wins, else TOML value
         self._num_samples: int = num_samples if num_samples is not None else collect["num_samples"]
         self._video_duration_sec: int = video_duration_sec if video_duration_sec is not None else collect["video_duration_sec"]
         self._video_fps: int = video_fps if video_fps is not None else collect["video_fps"]
@@ -74,13 +65,11 @@ class DataCollector:
         self._camera_settle_time_sec: int = collect["camera_settle_time_sec"]
         self._vertical_move_settle_time_sec: float = collect["vertical_move_settle_time_sec"]
 
-        # Paths
         root = Path(data_root) if data_root is not None else Path(paths["data_root"])
         self._video_dir: Path = root / "videos"
         self._pose_dir: Path = root / "poses"
         self._bbox_dir: Path = root / "bboxes"
 
-        # Target
         self._target_lat: float = target["lat"]
         self._target_lon: float = target["lon"]
         self._target_alt: float = target["alt"]
@@ -88,20 +77,19 @@ class DataCollector:
         self._default_pitch: float = target["pitch"]
         self._default_yaw: float = target["yaw"]
 
-        # POVs
         if povs is not None:
             self._povs = povs
         else:
             self._povs = [
                 PovConfig(
-                    id=p["id"],
-                    lat=p["lat"],
-                    lon=p["lon"],
-                    alt=p["alt"],
-                    move_up_m=p.get("move_up_m", 0.0),
-                    pitch_deg=p.get("pitch_deg", 0.0),
+                    id=pov["id"],
+                    lat=pov["lat"],
+                    lon=pov["lon"],
+                    alt=pov["alt"],
+                    move_up_m=pov.get("move_up_m", 0.0),
+                    pitch_deg=pov.get("pitch_deg", 0.0),
                 )
-                for p in cfg.collect_povs
+                for pov in config.collect_povs
             ]
 
     # ------------------------------------------------------------------
@@ -165,10 +153,12 @@ class DataCollector:
     # ------------------------------------------------------------------
 
     def _create_output_directories(self) -> None:
+        """Create the output directories for videos, poses, and bboxes."""
         for directory in (self._video_dir, self._pose_dir, self._bbox_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
     def _get_next_sample_id(self) -> int:
+        """Return the next available sample ID based on existing files."""
         sample_ids = []
         for video in self._video_dir.glob("sample_*_pov_*.mp4"):
             match = SAMPLE_PATTERN.match(video.name)
@@ -177,9 +167,11 @@ class DataCollector:
         return (max(sample_ids) + 1) if sample_ids else 0
 
     def _build_filename_prefix(self, sample_id: int, pov: PovConfig) -> str:
+        """Build the filename prefix for a given sample and POV."""
         return f"sample_{sample_id:03d}_pov_{pov.id}"
 
     def _move_camera(self, camera: UdpBot, pov: PovConfig) -> None:
+        """Move the camera to the given POV and orient it toward the target."""
         camera.move_to_point(
             pov.lat, pov.lon, pov.alt,
             self._default_roll, self._default_pitch, self._default_yaw,
@@ -198,6 +190,7 @@ class DataCollector:
 
     @staticmethod
     def _publish_oscillation(publisher) -> None:
+        """Publish an oscillation control command twice to ensure delivery."""
         msg = Empty()
         for _ in range(2):
             publisher.publish(msg)
@@ -205,16 +198,19 @@ class DataCollector:
         sleep(0.2)
 
     def _start_recording(self, video, pose, bbox) -> None:
+        """Start capture on all recording nodes."""
         video.start_capture()
         pose.start_capture()
         bbox.start_capture()
 
     def _stop_recording(self, video, pose, bbox) -> None:
+        """Stop capture on all recording nodes."""
         bbox.stop_capture()
         pose.stop_capture()
         video.stop_capture()
 
     def _save_recording(self, sample_id: int, pov: PovConfig, video, pose, bbox) -> None:
+        """Save captured data to disk for a given sample and POV."""
         prefix = self._build_filename_prefix(sample_id, pov)
         video.save_data_to(str(self._video_dir / f"{prefix}.mp4"), self._video_fps)
         pose.save_data_to(str(self._pose_dir / f"{prefix}.pkl"))
@@ -223,6 +219,7 @@ class DataCollector:
     def _capture_sample_from_pov(
         self, sample_id, pov, camera, video, pose, bbox, reset_pub
     ) -> None:
+        """Record a single sample from one point of view."""
         print(f"Recording dataset sample {sample_id:03d} | POV {pov.id}")
         self._move_camera(camera, pov)
         self._publish_oscillation(reset_pub)
@@ -232,6 +229,7 @@ class DataCollector:
         self._save_recording(sample_id, pov, video, pose, bbox)
 
     def _generate_dataset(self, camera, video, pose, bbox, reset_pub, new_pub) -> None:
+        """Generate all dataset samples across all configured POVs."""
         start_sample = self._get_next_sample_id()
         end_sample = start_sample + self._num_samples
 
@@ -249,8 +247,8 @@ class DataCollector:
 
     @staticmethod
     def _create_oscillation_publishers():
-        cfg = get_config()
-        grayscale = cfg.grayscale
+        """Create ROS2 publishers for oscillation reset and new-profile topics."""
+        grayscale = get_config().grayscale
 
         node = rclpy.create_node("oscillation_control_publisher")
         qos = QoSProfile(

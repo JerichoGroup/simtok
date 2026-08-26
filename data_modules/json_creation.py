@@ -1,12 +1,4 @@
-"""Combine pose and bbox pickle files into per-frame JSON metadata.
-
-Pose pkl structure: dict[frame_id (int) -> GeoPoseStamped msg]
-    GeoPoseStamped.pose.orientation stores RPY as: x=roll, y=pitch, z=yaw
-
-Bbox pkl structure: dict[frame_id (int) -> FrameBboxes msg]
-    FrameBboxes.bboxes is a list of Bbox msgs, each with:
-        target_name, in_frame, is_visible, distance_x, distance_y, distance_z
-"""
+"""Generate per-frame JSON metadata from pose and bbox pickle files."""
 
 from __future__ import annotations
 
@@ -26,21 +18,13 @@ from config import get_config
 
 
 def load_pkl(path: Path) -> Dict[int, Any]:
-    """Load a pickle file and return its contents."""
+    """Load and return the contents of a pickle file."""
     with path.open("rb") as f:
         return pickle.load(f)
 
 
 def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
-    """Extract relevant fields from a single frame's pose and bbox messages.
-
-    Args:
-        pose_msg: A GeoPoseStamped message (orientation.y = pitch, orientation.z = yaw)
-        bbox_msg: A FrameBboxes message (bboxes list with distance and target info)
-
-    Returns:
-        Dictionary with per-frame data including pitch, yaw, and bbox target info.
-    """
+    """Extract pitch, yaw, and target distances from a single frame's messages."""
     orientation = pose_msg.pose.orientation
     pitch = math.degrees(float(orientation.x))
     yaw_enu = float(orientation.z)
@@ -74,10 +58,7 @@ def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
 
 
 def build_json(pose_data: Dict[int, Any], bbox_data: Dict[int, Any]) -> Dict[str, Any]:
-    """Build the full JSON structure by iterating over all frames.
-
-    Aligns frames by frame_id (integer keys present in both pkls).
-    """
+    """Build the full JSON structure from aligned pose and bbox frame data."""
     common_frames = sorted(set(pose_data.keys()) & set(bbox_data.keys()))
 
     if not common_frames:
@@ -97,11 +78,8 @@ def build_json(pose_data: Dict[int, Any], bbox_data: Dict[int, Any]) -> Dict[str
     }
 
 
-def find_matching_bbox_file(
-    pose_file: Path,
-    bbox_directory: Path,
-) -> Path | None:
-    """Return the matching bbox PKL if it exists."""
+def find_matching_bbox_file(pose_file: Path, bbox_directory: Path) -> Path | None:
+    """Return the matching bbox PKL path if it exists, otherwise None."""
     bbox_file = bbox_directory / pose_file.name
     if not bbox_file.exists():
         return None
@@ -109,7 +87,7 @@ def find_matching_bbox_file(
 
 
 def find_pose_files(pose_directory: Path) -> List[Path]:
-    """Return all pose PKL files."""
+    """Return all pose PKL files sorted from the given directory."""
     pose_files = sorted(pose_directory.glob("*.pkl"))
     if not pose_files:
         raise FileNotFoundError(
@@ -119,18 +97,14 @@ def find_pose_files(pose_directory: Path) -> List[Path]:
 
 
 def write_json_file(output_path: Path, json_data: Dict[str, Any]) -> None:
-    """Write JSON data to disk."""
+    """Write a JSON dict to disk, creating parent directories as needed."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w") as f:
         json.dump(json_data, f, indent=4)
 
 
-def process_pkl_pair(
-    pose_file: Path,
-    bbox_file: Path,
-    output_directory: Path,
-) -> None:
-    """Convert one pose/bbox pair into a JSON file."""
+def process_pkl_pair(pose_file: Path, bbox_file: Path, output_directory: Path) -> None:
+    """Convert one pose/bbox PKL pair into a JSON file."""
     pose_data = load_pkl(pose_file)
     bbox_data = load_pkl(bbox_file)
 
@@ -146,14 +120,10 @@ def process_pkl_pair(
 
 
 class JsonCreator:
-    """Generate per-frame JSON metadata from pose and bbox pickle files.
-
-    Resolves parameters using the priority: constructor arg > TOML config.
-    If a constructor argument is None, the value is read from the shared TOML.
-    """
+    """Generate per-frame JSON metadata for the entire dataset."""
 
     def __init__(self, data_root: Optional[Path] = None) -> None:
-        """Initialize the JSON creator, resolving data_root from arg or TOML."""
+        """Initialize the creator, prioritizing explicit data_root over TOML config."""
         cfg = get_config()
         paths = cfg.paths
 
@@ -164,7 +134,7 @@ class JsonCreator:
         self._json_dir: Path = resolved_root / "jsons"
 
     def process_dataset(self) -> None:
-        """Generate JSON files for the entire dataset."""
+        """Generate JSON files for all matching pose/bbox pairs in the dataset."""
         pose_files = find_pose_files(self._pose_dir)
 
         for pose_file in pose_files:

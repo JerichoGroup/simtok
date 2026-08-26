@@ -1,6 +1,4 @@
-"""Script node that subscribes to a ROS2 bbox topic,
-computes the 3D distance to a target, and applies grayscale brightness
-using an in-memory oscillation profile to configured prims."""
+"""Apply grayscale thermal brightness to configured prims based on distance and oscillation."""
 
 from __future__ import annotations
 
@@ -45,7 +43,7 @@ OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
 
 
 def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> Optional[float]:
-    """Return 3D Euclidean distance to the target bbox."""
+    """Return the 3D Euclidean distance to the named target from a bbox message."""
     for bbox in msg.bboxes:
         if bbox.target_name == target_name:
             return math.sqrt(
@@ -57,14 +55,14 @@ def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> 
 
 
 def apply_thermal_fading(gray_value: float, distance: Optional[float], alpha: float = ALPHA) -> float:
-    """Apply exponential thermal fading."""
+    """Apply exponential thermal attenuation based on distance."""
     if distance is None:
         return gray_value
     return gray_value * math.exp(-alpha * distance)
 
 
 def generate_oscillation_values() -> list[float]:
-    """Generate a random oscillation profile (ramp up then mirror down)."""
+    """Generate a symmetric random oscillation profile."""
     num_values = random.randint(
         OSCILLATION_NUM_VALUES_MIN,
         OSCILLATION_NUM_VALUES_MAX,
@@ -79,9 +77,10 @@ def generate_oscillation_values() -> list[float]:
 
 
 class ROS2BboxNode:
-    """Subscribes to bbox topic and produces distance + oscillation offset."""
+    """Subscribe to bbox and oscillation control topics to produce distance and offset."""
 
     def __init__(self):
+        """Create the ROS2 node with bbox and control subscriptions."""
         self.node = rclpy.create_node("ros2_gray_scale_node")
         self.is_spinning = False
         self.bbox_subscriber = None
@@ -126,6 +125,7 @@ class ROS2BboxNode:
         )
 
     def bbox_callback(self, msg: FrameBboxes) -> None:
+        """Update distance and advance the oscillation index on each bbox message."""
         self.current_distance = get_distance_to_target(msg, TARGET_NAME)
 
         if not self.oscillation_values:
@@ -138,7 +138,7 @@ class ROS2BboxNode:
         self.oscillation_index += 1
 
     def restart_oscillation_profile_callback(self, _: Empty) -> None:
-        """Restart playback from the beginning of the current oscillation profile."""
+        """Reset the oscillation index to replay the current profile from the start."""
         self.oscillation_index = 0
 
         if self.oscillation_values:
@@ -147,7 +147,7 @@ class ROS2BboxNode:
             self.current_offset = 0.0
 
     def generate_new_oscillation_profile_callback(self, _: Empty) -> None:
-        """Generate a new random oscillation profile and restart playback."""
+        """Generate a new random oscillation profile and reset playback."""
         self.oscillation_values = generate_oscillation_values()
         self.oscillation_index = 0
 
@@ -157,7 +157,7 @@ class ROS2BboxNode:
             self.current_offset = 0.0
 
     def subscribe(self):
-        """Subscribe to bbox topic."""
+        """Subscribe to the bbox topic and start spinning in a background thread."""
         if self.bbox_subscriber is None:
             self.bbox_subscriber = self.node.create_subscription(
                 FrameBboxes, BBOX_TOPIC_NAME, self.bbox_callback, self.qos_profile
@@ -168,21 +168,23 @@ class ROS2BboxNode:
             self.is_spinning = True
 
     def _spin(self) -> None:
+        """Run the ROS2 executor in a blocking loop."""
         self.executor.add_node(self.node)
         self.executor.spin()
 
 
 class PrimColorController:
-    """Handles grayscale updates for a single USD prim."""
+    """Control the grayscale display color of a single USD prim."""
 
     def __init__(self, prim_path: str, default_gray: float = 0.5):
+        """Store the prim path and default gray value."""
         self.prim_path = prim_path
         self.default_gray = default_gray
         self.initialized = False
         self.base_gray = default_gray
 
     def initialize_base_gray(self, stage):
-        """Initialize the base gray value from the prim's display color."""
+        """Read the prim's current display color to establish the base gray."""
         prim = stage.GetPrimAtPath(self.prim_path)
 
         if not prim.IsValid():
@@ -196,7 +198,7 @@ class PrimColorController:
         self.initialized = True
 
     def update(self, stage, offset: float, distance: Optional[float]):
-        """Update the prim's color based on the current offset and distance."""
+        """Compute and apply the new grayscale value to the prim."""
         prim = stage.GetPrimAtPath(self.prim_path)
 
         if not prim.IsValid():
@@ -215,6 +217,7 @@ class PrimColorController:
 
 
 def setup(db):
+    """Initialize rclpy, the bbox node, and color controllers for all configured prims."""
     if not rclpy.ok():
         try:
             rclpy.init()
@@ -224,7 +227,6 @@ def setup(db):
     db.internal_state.ros2_bbox_node = ROS2BboxNode()
     db.internal_state.ros2_bbox_node.subscribe()
 
-    # Build one controller per configured prim
     db.internal_state.prim_controllers = [
         PrimColorController(prim_cfg["path"], prim_cfg.get("default_gray", 0.5))
         for prim_cfg in _prims_cfg
@@ -232,7 +234,7 @@ def setup(db):
 
 
 def compute(db):
-    """Apply grayscale updates to all configured prims using shared oscillation."""
+    """Update all prim colors using the current oscillation offset and distance."""
     node = getattr(db.internal_state, "ros2_bbox_node", None)
     controllers = getattr(db.internal_state, "prim_controllers", None)
 
@@ -257,6 +259,7 @@ def compute(db):
 
 
 def cleanup(db):
+    """Destroy the ROS2 node and shut down rclpy."""
     node = getattr(db.internal_state, "ros2_bbox_node", None)
 
     if node is not None:

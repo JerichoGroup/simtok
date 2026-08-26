@@ -1,8 +1,4 @@
-"""Store shared configuration state for the noise processor.
-
-Loads noise parameters from the unified simtok_config.toml and exposes
-them as a flat dict for backward compatibility with noise_models.py.
-"""
+"""Provide shared noise configuration state loaded from the unified TOML."""
 
 from __future__ import annotations
 
@@ -25,6 +21,5 @@ def load_config() -> None:
     cfg = get_config()
     config.clear()
     config.update(cfg.noise_flat)
-    # Also inject paths for use by NoiseProcessor
     config["input_video_dir"] = cfg.paths.get("video_dir", "data/videos")
     config["output_video_dir"] = cfg.paths.get("noise_video_dir", "data/noise_videos")

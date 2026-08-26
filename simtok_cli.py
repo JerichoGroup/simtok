@@ -1,11 +1,4 @@
-"""SimTok CLI entrypoint.
-
-Usage:
-    python -m simtok collect     [--num-samples N] [--duration SEC] [--data-root DIR]
-    python -m simtok noise       [--input-video-dir DIR] [--output-video-dir DIR]
-    python -m simtok json        [--data-root DIR]
-    python -m simtok run-all     [--data-root DIR]
-"""
+"""Provide the CLI entrypoint for the SimTok pipeline."""
 
 from __future__ import annotations
 
