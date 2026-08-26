@@ -27,8 +27,6 @@ from config import get_config
 
 
 SAMPLE_PATTERN = re.compile(r"sample_(\d{3})_pov_\d+\.mp4")
-RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
-NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
 
 
 @dataclass(frozen=True)
@@ -251,12 +249,15 @@ class DataCollector:
 
     @staticmethod
     def _create_oscillation_publishers():
+        cfg = get_config()
+        grayscale = cfg.grayscale
+
         node = rclpy.create_node("oscillation_control_publisher")
         qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
-        reset_pub = node.create_publisher(Empty, RESET_OSCILLATION_TOPIC, qos)
-        new_pub = node.create_publisher(Empty, NEW_OSCILLATION_TOPIC, qos)
+        reset_pub = node.create_publisher(Empty, grayscale["reset_oscillation_topic"], qos)
+        new_pub = node.create_publisher(Empty, grayscale["new_oscillation_topic"], qos)
         return node, reset_pub, new_pub

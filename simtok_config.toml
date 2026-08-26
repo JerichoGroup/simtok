@@ -79,3 +79,28 @@ enable_dead_pixels = true
 [noise.image]
 contrast = 1.0
 brightness = 0
+
+# =============================================================================
+# Grayscale Script Node (Isaac Sim)
+# =============================================================================
+
+[grayscale]
+bbox_topic_name = "/isaac_core/bbox"
+target_name = "Cube"
+reset_oscillation_topic = "/simtok/reset_oscillation"
+new_oscillation_topic = "/simtok/new_oscillation"
+alpha = 0.001
+
+[grayscale.oscillation]
+min = -0.26
+max = 0.26
+num_values_min = 300
+num_values_max = 600
+
+[[grayscale.prims]]
+path = "/bboxes/Cube"
+default_gray = 0.5
+
+[[grayscale.prims]]
+path = "/World/line2"
+default_gray = 0.7

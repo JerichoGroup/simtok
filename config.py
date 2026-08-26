@@ -79,6 +79,24 @@ class SimtokConfig:
         flat.update(self.noise_image)
         return flat
 
+    @property
+    def grayscale(self) -> Dict[str, Any]:
+        """Return [grayscale] section (scalars only, no sub-tables)."""
+        section = dict(self._data.get("grayscale", {}))
+        section.pop("oscillation", None)
+        section.pop("prims", None)
+        return section
+
+    @property
+    def grayscale_oscillation(self) -> Dict[str, Any]:
+        """Return [grayscale.oscillation]."""
+        return dict(self._data.get("grayscale", {}).get("oscillation", {}))
+
+    @property
+    def grayscale_prims(self) -> list[Dict[str, Any]]:
+        """Return [[grayscale.prims]] array of tables."""
+        return list(self._data.get("grayscale", {}).get("prims", []))
+
     # ------------------------------------------------------------------
     # Generic access
     # ------------------------------------------------------------------
