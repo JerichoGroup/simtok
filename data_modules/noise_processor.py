@@ -3,11 +3,10 @@
 import cv2
 import numpy as np
 import argparse
-import tomli as tomllib
 from pathlib import Path
 from typing import List
 
-from noise_config import config, load_config, DEFAULT_CONFIG_PATH
+from noise_config import config, load_config
 
 from noise_models import (
     NoiseModel,
@@ -128,19 +127,18 @@ class ThermalVideoPipeline:
 
         return models
 
-    def run(self) -> None:
+    def run(self, input_video: str, output_video: str) -> None:
         """Run noise models on each frame and write the output video."""
-        reader = VideoReader(config["input_video"])
+        reader = VideoReader(input_video)
 
         writer = VideoWriter(
-            config["output_video"],
+            output_video,
             reader.fps,
             reader.width,
             reader.height,
         )
 
         noise_models = self._build_noise_models(reader.width, reader.height)
-
         processor = ThermalProcessor(noise_models)
 
         frame_count: int = 0
@@ -164,7 +162,7 @@ class ThermalVideoPipeline:
         reader.release()
         writer.release()
 
-        print(f"Done. Saved to {config['output_video']}")
+        print(f"Done. Saved to {output_video}")
 
 
 def find_video_files(video_directory: Path) -> list[Path]:
@@ -192,12 +190,13 @@ def build_output_video_path(
 class NoiseProcessor:
     """Provide a high-level API for applying thermal noise to videos."""
 
-    def __init__(self, data_root: Path = Path("data")) -> None:
+    def __init__(self, data_root: Path | None = None) -> None:
         """Initialize the processor and load configuration."""
         load_config()
-        self.data_root: Path = data_root
-        self.video_directory: Path = data_root / "videos"
-        self.output_directory: Path = data_root / "noise_videos"
+        self.data_root: Path = data_root or Path(config["data_root"])
+        self.video_directory: Path = self.data_root / "videos"
+        self.output_directory: Path = self.data_root / "noise_videos"
+        self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
         """Apply thermal noise to every video in the dataset."""
@@ -213,13 +212,10 @@ class NoiseProcessor:
 
     def process_video(self, input_video: Path, output_video: Path) -> None:
         """Process a single video with thermal noise."""
-        config["input_video"] = str(input_video)
-        config["output_video"] = str(output_video)
-
         print(f"Input : {input_video.name}")
         print(f"Output: {output_video.name}")
 
-        ThermalVideoPipeline().run()
+        self._pipeline.run(str(input_video), str(output_video))
 
 
 def parse_args() -> argparse.Namespace:
@@ -242,14 +238,7 @@ def main() -> None:
     """Run the noise processor from the command line."""
     args = parse_args()
 
-    # Load defaults from toml config for data_root fallback
-    with open(DEFAULT_CONFIG_PATH, "rb") as config_file:
-        toml_data = tomllib.load(config_file)
-
-    # CLI args override toml values
-    data_root = args.data_root or Path(toml_data.get("general", {}).get("data_root", "data"))
-
-    processor = NoiseProcessor(data_root=data_root)
+    processor = NoiseProcessor(data_root=args.data_root)
     processor.process_dataset()
 
 
