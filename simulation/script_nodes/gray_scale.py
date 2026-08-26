@@ -12,7 +12,7 @@ from typing import Optional
 from std_msgs.msg import Empty
 import rclpy
 from isaac_ros2_messages.msg import FrameBboxes
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import omni.usd
 from pxr import Gf, UsdGeom
@@ -22,24 +22,42 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from config import get_config
+try:
+    from config import get_config
 
-# Load config once at module level
-_cfg = get_config()
-_grayscale = _cfg.grayscale
-_oscillation_cfg = _cfg.grayscale_oscillation
-_prims_cfg = _cfg.grayscale_prims
+    _cfg = get_config()
+    _grayscale = _cfg.grayscale
+    _oscillation_cfg = _cfg.grayscale_oscillation
+    _prims_cfg = _cfg.grayscale_prims
 
-BBOX_TOPIC_NAME = _grayscale["bbox_topic_name"]
-TARGET_NAME = _grayscale["target_name"]
-RESET_OSCILLATION_TOPIC = _grayscale["reset_oscillation_topic"]
-NEW_OSCILLATION_TOPIC = _grayscale["new_oscillation_topic"]
-ALPHA = _grayscale["alpha"]
+    BBOX_TOPIC_NAME = _grayscale["bbox_topic_name"]
+    TARGET_NAME = _grayscale["target_name"]
+    RESET_OSCILLATION_TOPIC = _grayscale["reset_oscillation_topic"]
+    NEW_OSCILLATION_TOPIC = _grayscale["new_oscillation_topic"]
+    ALPHA = _grayscale["alpha"]
 
-OSCILLATION_MIN = _oscillation_cfg["min"]
-OSCILLATION_MAX = _oscillation_cfg["max"]
-OSCILLATION_NUM_VALUES_MIN = _oscillation_cfg["num_values_min"]
-OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
+    OSCILLATION_MIN = _oscillation_cfg["min"]
+    OSCILLATION_MAX = _oscillation_cfg["max"]
+    OSCILLATION_NUM_VALUES_MIN = _oscillation_cfg["num_values_min"]
+    OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
+
+except Exception:
+    # Fallback defaults when running inside Isaac Sim without access to the TOML
+    BBOX_TOPIC_NAME = "/isaac_core/bbox"
+    TARGET_NAME = "Cube"
+    RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
+    NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
+    ALPHA = 0.001
+
+    OSCILLATION_MIN = -0.26
+    OSCILLATION_MAX = 0.26
+    OSCILLATION_NUM_VALUES_MIN = 300
+    OSCILLATION_NUM_VALUES_MAX = 600
+
+    _prims_cfg = [
+        {"path": "/bboxes/Cube", "default_gray": 0.5},
+        {"path": "/World/line2", "default_gray": 0.7},
+    ]
 
 
 def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> Optional[float]:
@@ -97,7 +115,7 @@ class ROS2BboxNode:
             depth=1,
         )
 
-        self.executor = MultiThreadedExecutor()
+        self.executor = SingleThreadedExecutor()
 
         try:
             self.node.declare_parameter("use_sim_time", True)
