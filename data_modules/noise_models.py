@@ -18,7 +18,7 @@ class NoiseModel(ABC):
         pass
 
 
-class ThermalBlur(NoiseModel):
+class ThermalBlurNoise(NoiseModel):
     """Simulate thermal diffusion via Gaussian blur."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
@@ -88,7 +88,7 @@ class TemporalNoise(NoiseModel):
         return image + noise
 
 
-class HotPixels(NoiseModel):
+class HotPixelsNoise(NoiseModel):
     """Simulate stuck-high hot pixels on the sensor."""
 
     def __init__(self, width: int, height: int) -> None:
@@ -106,7 +106,7 @@ class HotPixels(NoiseModel):
         return result
 
 
-class SensorDrift(NoiseModel):
+class SensorDriftNoise(NoiseModel):
     """Simulate slow sensor baseline drift over time."""
 
     def __init__(self) -> None:
@@ -120,7 +120,7 @@ class SensorDrift(NoiseModel):
         return image + self.offset
 
 
-class DeadPixels(NoiseModel):
+class DeadPixelsNoise(NoiseModel):
     """Simulate stuck-low dead pixels on the sensor."""
 
     def __init__(self, width: int, height: int) -> None:
@@ -138,7 +138,7 @@ class DeadPixels(NoiseModel):
         return result
 
 
-class AGC(NoiseModel):
+class AGCNoise(NoiseModel):
     """Simulate automatic gain control via histogram normalization."""
 
     def process(self, image: np.ndarray) -> np.ndarray:
@@ -152,7 +152,7 @@ class AGC(NoiseModel):
         )
 
 
-class LowResolution(NoiseModel):
+class LowResolutionNoise(NoiseModel):
     """Simulate low sensor resolution via downsample and upsample."""
 
     def process(self, image: np.ndarray) -> np.ndarray:

@@ -12,15 +12,15 @@ from config import get_config
 from data_modules.noise_models import (
     config,
     NoiseModel,
-    ThermalBlur,
+    ThermalBlurNoise,
     FixedPatternNoise,
     GaussianNoise,
     TemporalNoise,
-    HotPixels,
-    SensorDrift,
-    DeadPixels,
-    AGC,
-    LowResolution,
+    HotPixelsNoise,
+    SensorDriftNoise,
+    DeadPixelsNoise,
+    AGCNoise,
+    LowResolutionNoise,
 )
 
 
@@ -108,7 +108,7 @@ class ThermalVideoPipeline:
         models: List[NoiseModel] = []
 
         if config["enable_blur"]:
-            models.append(ThermalBlur())
+            models.append(ThermalBlurNoise())
         if config["enable_fixed_pattern"]:
             models.append(FixedPatternNoise(width, height))
         if config["enable_gaussian_noise"]:
@@ -116,15 +116,15 @@ class ThermalVideoPipeline:
         if config["enable_temporal_noise"]:
             models.append(TemporalNoise())
         if config["enable_low_resolution"]:
-            models.append(LowResolution())
+            models.append(LowResolutionNoise())
         if config["enable_agc"]:
-            models.append(AGC())
+            models.append(AGCNoise())
         if config["enable_sensor_drift"]:
-            models.append(SensorDrift())
+            models.append(SensorDriftNoise())
         if config["enable_hot_pixels"]:
-            models.append(HotPixels(width, height))
+            models.append(HotPixelsNoise(width, height))
         if config["enable_dead_pixels"]:
-            models.append(DeadPixels(width, height))
+            models.append(DeadPixelsNoise(width, height))
 
         return models
 
