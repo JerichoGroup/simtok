@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import List, Optional
 
-from data_modules.noise_config import config, load_config
+from config import get_config
 
 from data_modules.noise_models import (
     NoiseModel,
@@ -21,6 +21,8 @@ from data_modules.noise_models import (
     AGC,
     LowResolution,
 )
+
+config = get_config().noise_flat
 
 
 class VideoReader:
@@ -188,9 +190,10 @@ class NoiseProcessor:
         output_video_dir: Optional[Path] = None,
     ) -> None:
         """Initialize the processor, prioritizing explicit args over TOML config."""
-        load_config()
-        self.video_directory: Path = input_video_dir if input_video_dir is not None else Path(config["input_video_dir"])
-        self.output_directory: Path = output_video_dir if output_video_dir is not None else Path(config["output_video_dir"])
+        cfg = get_config()
+        paths = cfg.paths
+        self.video_directory: Path = input_video_dir if input_video_dir is not None else Path(paths.get("video_dir", "data/videos"))
+        self.output_directory: Path = output_video_dir if output_video_dir is not None else Path(paths.get("noise_video_dir", "data/noise_videos"))
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:

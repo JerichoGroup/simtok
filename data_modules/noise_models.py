@@ -4,7 +4,9 @@ import cv2
 import numpy as np
 from abc import ABC, abstractmethod
 
-from data_modules.noise_config import config
+from config import get_config
+
+config = get_config().noise_flat
 
 
 class NoiseModel(ABC):
