@@ -10,6 +10,7 @@ from typing import List, Optional
 from config import get_config
 
 from data_modules.noise_models import (
+    config,
     NoiseModel,
     ThermalBlur,
     FixedPatternNoise,
@@ -21,8 +22,6 @@ from data_modules.noise_models import (
     AGC,
     LowResolution,
 )
-
-config = get_config().noise_flat
 
 
 class VideoReader:
