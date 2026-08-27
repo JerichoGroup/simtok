@@ -37,7 +37,8 @@ lat = 32.123269
 lon = 35.1232421
 alt = 0.0
 move_up_m = 5.0
-pitch_deg = -5.0
+pitch_deg = -15.0
+zoom = 0.5
 
 [[collect.povs]]
 id = 2
@@ -46,6 +47,7 @@ lon = 35.1233561
 alt = 0.0
 move_up_m = 0.0
 pitch_deg = 0.0
+zoom = 0.0
 
 # =============================================================================
 # Noise Processor

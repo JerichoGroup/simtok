@@ -18,7 +18,7 @@ from isaac_core_dev_kit.core_capture.pose_capture import PoseCapture
 from isaac_core_dev_kit.core_capture.video_capture import VideoCapture
 from isaac_core_dev_kit.isaac_manager.host_isaac_manager import HostIsaacManager
 from isaac_core_dev_kit.udp.udp_bot import UdpBot
-
+from simtok_utils.zoom_manager import ZoomCommander
 from config import get_config
 
 
@@ -35,6 +35,7 @@ class PovConfig:
     alt: float
     move_up_m: float = 0.0
     pitch_deg: float = 0.0
+    zoom: float = 0.0
 
 
 class DataCollector:
@@ -88,6 +89,7 @@ class DataCollector:
                     alt=pov["alt"],
                     move_up_m=pov.get("move_up_m", 0.0),
                     pitch_deg=pov.get("pitch_deg", 0.0),
+                    zoom=pov.get("zoom", 0.0),
                 )
                 for pov in config.collect_povs
             ]
@@ -124,6 +126,7 @@ class DataCollector:
         video = VideoCapture()
         pose = PoseCapture()
         bbox = BboxCapture()
+        zoom_commander = ZoomCommander(init_ros=False)
 
         with sim:
             sleep(self._initial_scene_load_time_sec)
@@ -140,11 +143,12 @@ class DataCollector:
                 print("Waiting for thermal node...")
                 sleep(0.1)
 
-            self._generate_dataset(camera, video, pose, bbox, reset_pub, new_pub)
+            self._generate_dataset(camera, video, pose, bbox, reset_pub, new_pub, zoom_commander)
 
         video.shutdown()
         pose.shutdown()
         bbox.shutdown()
+        zoom_commander.close()
         oscillation_node.destroy_node()
         core_utils.safe_rclpy_shutdown()
 
@@ -170,7 +174,7 @@ class DataCollector:
         """Build the filename prefix for a given sample and POV."""
         return f"sample_{sample_id:03d}_pov_{pov.id}"
 
-    def _move_camera(self, camera: UdpBot, pov: PovConfig) -> None:
+    def _move_camera(self, camera: UdpBot, pov: PovConfig, zoom_commander: ZoomCommander) -> None:
         """Move the camera to the given POV and orient it toward the target."""
         camera.move_to_point(
             pov.lat, pov.lon, pov.alt,
@@ -185,6 +189,8 @@ class DataCollector:
 
         if pov.pitch_deg:
             camera.turn_pitch(pov.pitch_deg)
+
+        zoom_commander.set_zoom(pov.zoom)
 
         sleep(self._camera_settle_time_sec)
 
@@ -217,18 +223,18 @@ class DataCollector:
         bbox.save_data_to(str(self._bbox_dir / f"{prefix}.pkl"))
 
     def _capture_sample_from_pov(
-        self, sample_id, pov, camera, video, pose, bbox, reset_pub
+        self, sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
     ) -> None:
         """Record a single sample from one point of view."""
         print(f"Recording dataset sample {sample_id:03d} | POV {pov.id}")
-        self._move_camera(camera, pov)
+        self._move_camera(camera, pov, zoom_commander)
         self._publish_oscillation(reset_pub)
         self._start_recording(video, pose, bbox)
         sleep(self._video_duration_sec)
         self._stop_recording(video, pose, bbox)
         self._save_recording(sample_id, pov, video, pose, bbox)
 
-    def _generate_dataset(self, camera, video, pose, bbox, reset_pub, new_pub) -> None:
+    def _generate_dataset(self, camera, video, pose, bbox, reset_pub, new_pub, zoom_commander) -> None:
         """Generate all dataset samples across all configured POVs."""
         start_sample = self._get_next_sample_id()
         end_sample = start_sample + self._num_samples
@@ -242,7 +248,7 @@ class DataCollector:
 
             for pov in self._povs:
                 self._capture_sample_from_pov(
-                    sample_id, pov, camera, video, pose, bbox, reset_pub
+                    sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
                 )
 
     @staticmethod
