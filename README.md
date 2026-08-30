@@ -142,7 +142,7 @@ The system runs from a single entrypoint; `simtok_cli.py` and can execute each s
 
 
 Each one of the possible scenarios has its own sub-arguments, such as:
-`duration`, `--num-samples`...
+`duration`, `--num-samples`, `--data-root`...
 If none of the arguments are chosen, the system will use the default arguments in `simtok_config.toml`.
 
 
