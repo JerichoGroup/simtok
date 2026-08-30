@@ -1,0 +1,70 @@
+@startuml system_communications
+
+title SimTok — System Communications
+
+package "CLI" {
+    [simtok_cli.py]
+}
+
+package "Data Collection" {
+    [collect.py]
+    [zoom_manager.py]
+}
+
+package "Isaac Sim" {
+    [gray_scale.py]
+    [zoom_node.py]
+    [bbox_publisher]
+    [udp_camera]
+}
+
+package "Capture (dev_kit)" {
+    [VideoCapture]
+    [PoseCapture]
+    [BboxCapture]
+}
+
+package "Post-Processing" {
+    [noise_processor.py]
+    [json_creation.py]
+}
+
+database "data/" {
+    [videos/]
+    [poses/]
+    [bboxes/]
+    [noise_videos/]
+    [jsons/]
+}
+
+' === API calls ===
+[simtok_cli.py] --> [collect.py]
+[simtok_cli.py] --> [noise_processor.py]
+[simtok_cli.py] --> [json_creation.py]
+
+[collect.py] --> [zoom_manager.py]
+[collect.py] --> [VideoCapture]
+[collect.py] --> [PoseCapture]
+[collect.py] --> [BboxCapture]
+
+' === ROS2 topics ===
+[collect.py] -[bold]-> [gray_scale.py] : /simtok/reset_oscillation\n/simtok/new_oscillation
+[zoom_manager.py] -[bold]-> [zoom_node.py] : /simtok/zoom
+[bbox_publisher] -[bold]-> [gray_scale.py] : /isaac_core/bbox
+
+' === UDP ===
+[collect.py] -[dashed]-> [udp_camera] : UDP
+
+' === File I/O ===
+[VideoCapture] ..> [videos/]
+[PoseCapture] ..> [poses/]
+[BboxCapture] ..> [bboxes/]
+
+[noise_processor.py] ..> [videos/] : reads
+[noise_processor.py] ..> [noise_videos/] : writes
+
+[json_creation.py] ..> [poses/] : reads
+[json_creation.py] ..> [bboxes/] : reads
+[json_creation.py] ..> [jsons/] : writes
+
+@enduml
