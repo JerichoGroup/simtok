@@ -189,14 +189,16 @@ class NoiseProcessor:
 
     def __init__(
         self,
-        input_video_dir: Optional[Path] = None,
-        output_video_dir: Optional[Path] = None,
+        data_root: Optional[Path] = None,
     ) -> None:
-        """Initialize the processor, prioritizing explicit args over TOML config."""
+        """Initialize the processor, prioritizing explicit data_root over TOML config."""
         cfg = get_config()
         paths = cfg.paths
-        self.video_directory: Path = input_video_dir if input_video_dir is not None else Path(paths.get("video_dir", "data/videos"))
-        self.output_directory: Path = output_video_dir if output_video_dir is not None else Path(paths.get("noise_video_dir", "data/noise_videos"))
+
+        resolved_root = data_root if data_root is not None else Path(paths["data_root"])
+
+        self.video_directory: Path = resolved_root / "videos"
+        self.output_directory: Path = resolved_root / "noise_videos"
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:

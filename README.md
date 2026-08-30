@@ -23,13 +23,13 @@ SimTok is a tool for generating thermal data using `Issacsim` based on `Isaac Co
 
 #### 1. Simulating and collecting data
 
-The tool captures grayscale videos of a wall usd that are suppposed to mimic real thermal camera videos and preserve metadata.
+The tool captures grayscale videos of a wall usd that are supposed to mimic real thermal camera videos and preserve metadata.
 
 The videos are captured from two `POVS`:
 1. A **fixed** camera `POV` directed right at the target (a wall).
 2. A camera `POV` that varies in angles and distance from target.
 
-The metadata is beings saved as `pkl` files, preserving `Pose` and `Bbox`.
+The metadata is being saved as `pkl` files, preserving `Pose` and `Bbox`.
 - `Pose` being camera orientation and global location.
 - `Bbox` being distance from target in each axis, whether target is in frame, whether its visible (target may be in frame but hidden behind another object).
 
@@ -78,7 +78,7 @@ As well as files included in `Isaac Core 2023`, `SimTok` adds multiple scripts t
 > new_gray_value = gray_value * math.exp(-alpha * distance)
 > ```
 >
-> This script colors the `prim` according to the `themal fade` and the current offset value (current oscillation value).
+> This script colors the `prim` according to the `thermal fade` and the current offset value (current oscillation value).
 >
 > Subscribes to `/simtok/new_oscillation` and `/simtok/reset_oscillation` to know when to create a new oscillation and when to reset it.
 
@@ -138,10 +138,10 @@ The system runs from a single entrypoint; `simtok_cli.py` and can execute each s
 
 * `python3 simtok_cli.py json` runs only `json` conversion of `metadata`
 
-* `python3 simtol_cli.py noise` runs only the new processed videos with `thermal noise` creation.
+* `python3 simtok_cli.py noise` runs only the new processed videos with `thermal noise` creation.
 
 
-Each one of the possible scenarios has its own sub-argumnets, such as:
+Each one of the possible scenarios has its own sub-arguments, such as:
 `duration`, `--num-samples`...
 If none of the arguments are chosen, the system will use the default arguments in `simtok_config.toml`.
 

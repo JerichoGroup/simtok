@@ -51,12 +51,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Apply thermal noise to recorded videos.",
     )
     noise_parser.add_argument(
-        "--input-video-dir", type=Path, default=None,
-        help="Directory containing input videos (overrides TOML).",
-    )
-    noise_parser.add_argument(
-        "--output-video-dir", type=Path, default=None,
-        help="Directory to write processed videos (overrides TOML).",
+        "--data-root", type=Path, default=None,
+        help="Dataset root directory (overrides TOML).",
     )
 
     # --- json ---
@@ -90,14 +86,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--usd-path", type=str, default=None,
         help="USD scene file path (overrides TOML).",
     )
-    run_all_parser.add_argument(
-        "--input-video-dir", type=Path, default=None,
-        help="Directory containing input videos for noise stage (overrides TOML).",
-    )
-    run_all_parser.add_argument(
-        "--output-video-dir", type=Path, default=None,
-        help="Directory to write noise-processed videos (overrides TOML).",
-    )
 
     return parser
 
@@ -120,8 +108,7 @@ def _cmd_noise(args: argparse.Namespace) -> None:
     from data_modules.noise_processor import NoiseProcessor
 
     processor = NoiseProcessor(
-        input_video_dir=args.input_video_dir,
-        output_video_dir=args.output_video_dir,
+        data_root=args.data_root,
     )
     processor.process_dataset()
 
@@ -155,8 +142,7 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     logger.info("STAGE 2: Noise Processing")
     logger.info("=" * 60)
     processor = NoiseProcessor(
-        input_video_dir=args.input_video_dir,
-        output_video_dir=args.output_video_dir,
+        data_root=args.data_root,
     )
     processor.process_dataset()
 
