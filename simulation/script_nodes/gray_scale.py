@@ -192,7 +192,7 @@ class ROS2BboxNode:
 
 
 class PrimColorController:
-    """Control the grayscale color of a single USD prim via its bound material shader."""
+    """Control the grayscale display color of a single USD prim."""
 
     def __init__(self, prim_path: str, default_gray: float = 0.5):
         """Store the prim path and default gray value."""
@@ -200,59 +200,38 @@ class PrimColorController:
         self.default_gray = default_gray
         self.initialized = False
         self.base_gray = default_gray
-        self.shader = None
-
-    def _find_shader(self, stage):
-        """Find the OmniPBR shader bound to this prim."""
-        from pxr import UsdShade
-
-        prim = stage.GetPrimAtPath(self.prim_path)
-        if not prim.IsValid():
-            return None
-
-        binding_api = UsdShade.MaterialBindingAPI(prim)
-        material = binding_api.GetDirectBinding().GetMaterial()
-
-        if not material:
-            return None
-
-        for child in material.GetPrim().GetChildren():
-            shader = UsdShade.Shader(child)
-            if shader.GetIdAttr().Get() == "OmniPBR":
-                return shader
-
-        return None
 
     def initialize_base_gray(self, stage):
-        """Find the shader and read its current diffuse color as the baseline."""
-        from pxr import UsdShade
+        """Read the prim's current display color to establish the base gray."""
+        prim = stage.GetPrimAtPath(self.prim_path)
 
-        self.shader = self._find_shader(stage)
-
-        if self.shader is None:
+        if not prim.IsValid():
             return
 
-        diffuse_input = self.shader.GetInput("diffuse_color_constant")
-        if diffuse_input:
-            color = diffuse_input.Get()
-            if color:
-                self.base_gray = color[0]
+        mesh = UsdGeom.Mesh(prim)
+        attr = mesh.CreateDisplayColorAttr()
+        colors = attr.Get()
 
+        self.base_gray = colors[0][0] if colors else self.default_gray
         self.initialized = True
 
     def update(self, stage, offset: float, distance: Optional[float]):
-        """Compute and apply the new grayscale value to the shader."""
+        """Compute and apply the new grayscale value to the prim."""
+        prim = stage.GetPrimAtPath(self.prim_path)
+
+        if not prim.IsValid():
+            return
+
         if not self.initialized:
             self.initialize_base_gray(stage)
-
-        if self.shader is None:
-            return
 
         gray = self.base_gray + offset
         gray = apply_thermal_fading(gray, distance)
         gray = max(0.0, min(1.0, gray))
 
-        self.shader.GetInput("diffuse_color_constant").Set(Gf.Vec3f(gray, gray, gray))
+        mesh = UsdGeom.Mesh(prim)
+        attr = mesh.CreateDisplayColorAttr()
+        attr.Set([Gf.Vec3f(gray, gray, gray)])
 
 
 def setup(db):
