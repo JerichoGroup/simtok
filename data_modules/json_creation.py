@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import pickle
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Ensure the project root is importable
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -113,9 +116,10 @@ def process_pkl_pair(pose_file: Path, bbox_file: Path, output_directory: Path) -
     output_path = output_directory / f"{pose_file.stem}.json"
     write_json_file(output_path, result)
 
-    print(
-        f"[json_creation] "
-        f"Wrote {result['total_frames']} frames to {output_path}"
+    logger.info(
+        "[json_creation] Wrote %d frames to %s",
+        result['total_frames'],
+        output_path,
     )
 
 
@@ -141,7 +145,7 @@ class JsonCreator:
             bbox_file = find_matching_bbox_file(pose_file, self._bbox_dir)
 
             if bbox_file is None:
-                print(f"[WARNING] Missing bbox file: {pose_file.name}")
+                logger.warning("Missing bbox file: %s", pose_file.name)
                 continue
 
             process_pkl_pair(pose_file, bbox_file, self._json_dir)

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
@@ -140,7 +143,7 @@ class DataCollector:
                 reset_pub.get_subscription_count() == 0
                 or new_pub.get_subscription_count() == 0
             ):
-                print("Waiting for thermal node...")
+                logger.info("Waiting for thermal node...")
                 sleep(0.1)
 
             self._generate_dataset(camera, video, pose, bbox, reset_pub, new_pub, zoom_commander)
@@ -226,7 +229,7 @@ class DataCollector:
         self, sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
     ) -> None:
         """Record a single sample from one point of view."""
-        print(f"Recording dataset sample {sample_id:03d} | POV {pov.id}")
+        logger.info("Recording dataset sample %03d | POV %d", sample_id, pov.id)
         self._move_camera(camera, pov, zoom_commander)
         self._publish_oscillation(reset_pub)
         self._start_recording(video, pose, bbox)
@@ -240,9 +243,9 @@ class DataCollector:
         end_sample = start_sample + self._num_samples
 
         for sample_id in range(start_sample, end_sample):
-            print("=" * 60)
-            print(f"Generating dataset sample {sample_id:03d}")
-            print("=" * 60)
+            logger.info("=" * 60)
+            logger.info("Generating dataset sample %03d", sample_id)
+            logger.info("=" * 60)
 
             self._publish_oscillation(new_pub)
 

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Ensure the project root is on sys.path so internal imports resolve.
 _PROJECT_ROOT = Path(__file__).resolve().parent
@@ -137,9 +140,9 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     from data_modules.noise_processor import NoiseProcessor
     from data_modules.json_creation import JsonCreator
 
-    print("=" * 60)
-    print("STAGE 1: Data Collection")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STAGE 1: Data Collection")
+    logger.info("=" * 60)
     collector = DataCollector(
         num_samples=args.num_samples,
         video_duration_sec=args.duration,
@@ -148,24 +151,24 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     )
     collector.run()
 
-    print("\n" + "=" * 60)
-    print("STAGE 2: Noise Processing")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STAGE 2: Noise Processing")
+    logger.info("=" * 60)
     processor = NoiseProcessor(
         input_video_dir=args.input_video_dir,
         output_video_dir=args.output_video_dir,
     )
     processor.process_dataset()
 
-    print("\n" + "=" * 60)
-    print("STAGE 3: JSON Metadata Generation")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("STAGE 3: JSON Metadata Generation")
+    logger.info("=" * 60)
     creator = JsonCreator(data_root=args.data_root)
     creator.process_dataset()
 
-    print("\n" + "=" * 60)
-    print("Pipeline complete.")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Pipeline complete.")
+    logger.info("=" * 60)
 
 
 _COMMANDS = {
@@ -178,6 +181,10 @@ _COMMANDS = {
 
 def main() -> None:
     """Parse arguments and dispatch to the appropriate command handler."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
     parser = _build_parser()
     args = parser.parse_args()
 

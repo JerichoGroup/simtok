@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 import cv2
 import numpy as np
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from config import get_config
 
@@ -155,12 +159,12 @@ class ThermalVideoPipeline:
             frame_count += 1
 
             if frame_count % 100 == 0:
-                print(f"Processed {frame_count} frames")
+                logger.info("Processed %d frames", frame_count)
 
         reader.release()
         writer.release()
 
-        print(f"Done. Saved to {output_video}")
+        logger.info("Done. Saved to %s", output_video)
 
 
 def find_video_files(video_directory: Path) -> list[Path]:
@@ -209,7 +213,7 @@ class NoiseProcessor:
 
     def process_video(self, input_video: Path, output_video: Path) -> None:
         """Process a single video file with thermal noise."""
-        print(f"Input : {input_video.name}")
-        print(f"Output: {output_video.name}")
+        logger.info("Input : %s", input_video.name)
+        logger.info("Output: %s", output_video.name)
 
         self._pipeline.run(str(input_video), str(output_video))

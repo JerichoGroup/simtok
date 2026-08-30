@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import random
 import sys
 import threading
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from std_msgs.msg import Empty
 import rclpy
@@ -262,16 +265,17 @@ def compute(db):
     try:
         stage = omni.usd.get_context().get_stage()
 
-        print(
-            f"Distance={node.current_distance if node.current_distance else 'N/A'} | "
-            f"Offset={node.current_offset:+.4f}"
+        logger.info(
+            "Distance=%s | Offset=%+.4f",
+            node.current_distance if node.current_distance else "N/A",
+            node.current_offset,
         )
 
         for controller in controllers:
             controller.update(stage, node.current_offset, node.current_distance)
 
     except Exception as e:
-        print(f"Failed to update colors: {e}")
+        logger.error("Failed to update colors: %s", e)
 
     return True
 
@@ -284,13 +288,13 @@ def cleanup(db):
         try:
             node.node.destroy_node()
         except Exception as e:
-            print(e)
+            logger.error("Error destroying ROS2 node: %s", e)
 
     if rclpy.ok():
         try:
             rclpy.shutdown()
         except Exception as e:
-            print(e)
+            logger.error("Error shutting down rclpy: %s", e)
 
     db.internal_state.ros2_bbox_node = None
     db.internal_state.prim_controllers = None
