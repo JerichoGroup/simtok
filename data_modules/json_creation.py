@@ -22,8 +22,8 @@ from config import get_config
 
 def load_pkl(path: Path) -> Dict[int, Any]:
     """Load and return the contents of a pickle file."""
-    with path.open("rb") as f:
-        return pickle.load(f)
+    with path.open("rb") as file:
+        return pickle.load(file)
 
 
 def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from std_msgs.msg import Empty
 import rclpy
 from isaac_ros2_messages.msg import FrameBboxes
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import omni.usd
 from pxr import Gf, UsdGeom
@@ -44,7 +44,8 @@ try:
     OSCILLATION_NUM_VALUES_MIN = _oscillation_cfg["num_values_min"]
     OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
 
-except Exception:
+except Exception as e:
+    logger.warning("Failed to load TOML config, using fallback defaults: %s", e)
     # Fallback defaults when running inside Isaac Sim without access to the TOML
     BBOX_TOPIC_NAME = "/isaac_core/bbox"
     TARGET_NAME = "Cube"
@@ -118,13 +119,14 @@ class ROS2BboxNode:
             depth=1,
         )
 
-        self.executor = SingleThreadedExecutor()
+        self.executor = MultiThreadedExecutor()
 
         try:
             self.node.declare_parameter("use_sim_time", True)
         except rclpy.exceptions.ParameterAlreadyDeclaredException:
             pass
 
+        self._lock = threading.Lock()
         self.current_distance: Optional[float] = None
         self.current_offset: float = 0.0
 
@@ -147,35 +149,39 @@ class ROS2BboxNode:
 
     def bbox_callback(self, msg: FrameBboxes) -> None:
         """Update distance and advance the oscillation index on each bbox message."""
-        self.current_distance = get_distance_to_target(msg, TARGET_NAME)
+        distance = get_distance_to_target(msg, TARGET_NAME)
 
-        if not self.oscillation_values:
-            return
+        with self._lock:
+            self.current_distance = distance
 
-        if self.oscillation_index >= len(self.oscillation_values):
-            self.oscillation_index = 0
+            if not self.oscillation_values:
+                return
 
-        self.current_offset = self.oscillation_values[self.oscillation_index]
-        self.oscillation_index += 1
+            if self.oscillation_index >= len(self.oscillation_values):
+                self.oscillation_index = 0
+
+            self.current_offset = self.oscillation_values[self.oscillation_index]
+            self.oscillation_index += 1
 
     def restart_oscillation_profile_callback(self, _: Empty) -> None:
         """Reset the oscillation index to replay the current profile from the start."""
-        self.oscillation_index = 0
-
-        if self.oscillation_values:
-            self.current_offset = self.oscillation_values[0]
-        else:
-            self.current_offset = 0.0
+        with self._lock:
+            self.oscillation_index = 0
+            self.current_offset = self.oscillation_values[0] if self.oscillation_values else 0.0
 
     def generate_new_oscillation_profile_callback(self, _: Empty) -> None:
         """Generate a new random oscillation profile and reset playback."""
-        self.oscillation_values = generate_oscillation_values()
-        self.oscillation_index = 0
+        new_values = generate_oscillation_values()
 
-        if self.oscillation_values:
-            self.current_offset = self.oscillation_values[0]
-        else:
-            self.current_offset = 0.0
+        with self._lock:
+            self.oscillation_values = new_values
+            self.oscillation_index = 0
+            self.current_offset = new_values[0] if new_values else 0.0
+
+    def get_state(self) -> tuple[Optional[float], float]:
+        """Return (distance, offset) as a consistent snapshot."""
+        with self._lock:
+            return self.current_distance, self.current_offset
 
     def subscribe(self):
         """Subscribe to the bbox topic and start spinning in a background thread."""
@@ -185,13 +191,9 @@ class ROS2BboxNode:
             )
 
         if not self.is_spinning:
-            threading.Thread(target=self._spin, daemon=True).start()
+            self.executor.add_node(self.node)
+            threading.Thread(target=self.executor.spin, daemon=True).start()
             self.is_spinning = True
-
-    def _spin(self) -> None:
-        """Run the ROS2 executor in a blocking loop."""
-        self.executor.add_node(self.node)
-        self.executor.spin()
 
 
 class PrimColorController:
@@ -265,14 +267,16 @@ def compute(db):
     try:
         stage = omni.usd.get_context().get_stage()
 
+        distance, offset = node.get_state()
+
         logger.info(
             "Distance=%s | Offset=%+.4f",
-            node.current_distance if node.current_distance else "N/A",
-            node.current_offset,
+            distance if distance else "N/A",
+            offset,
         )
 
         for controller in controllers:
-            controller.update(stage, node.current_offset, node.current_distance)
+            controller.update(stage, offset, distance)
 
     except Exception as e:
         logger.error("Failed to update colors: %s", e)

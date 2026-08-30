@@ -131,29 +131,30 @@ class DataCollector:
         bbox = BboxCapture()
         zoom_commander = ZoomCommander(init_ros=False)
 
-        with sim:
-            sleep(self._initial_scene_load_time_sec)
+        try:
+            with sim:
+                sleep(self._initial_scene_load_time_sec)
 
-            video.spin()
-            pose.spin()
-            bbox.spin()
-            sleep(1.0)
+                video.spin()
+                pose.spin()
+                bbox.spin()
+                sleep(1.0)
 
-            while (
-                reset_pub.get_subscription_count() == 0
-                or new_pub.get_subscription_count() == 0
-            ):
-                logger.info("Waiting for thermal node...")
-                sleep(0.1)
+                while (
+                    reset_pub.get_subscription_count() == 0
+                    or new_pub.get_subscription_count() == 0
+                ):
+                    logger.info("Waiting for thermal node...")
+                    sleep(0.1)
 
-            self._generate_dataset(camera, video, pose, bbox, reset_pub, new_pub, zoom_commander)
-
-        video.shutdown()
-        pose.shutdown()
-        bbox.shutdown()
-        zoom_commander.close()
-        oscillation_node.destroy_node()
-        core_utils.safe_rclpy_shutdown()
+                self._generate_dataset(camera, video, pose, bbox, reset_pub, new_pub, zoom_commander)
+        finally:
+            video.shutdown()
+            pose.shutdown()
+            bbox.shutdown()
+            zoom_commander.close()
+            oscillation_node.destroy_node()
+            core_utils.safe_rclpy_shutdown()
 
     # ------------------------------------------------------------------
     # Private helpers
