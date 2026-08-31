@@ -6,6 +6,10 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from collect import DataCollector
+from data_modules.noise_processor import NoiseProcessor
+from data_modules.json_creation import JsonCreator
+
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +96,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_collect(args: argparse.Namespace) -> None:
     """Execute the collect subcommand."""
-    from collect import DataCollector
 
     collector = DataCollector(
         num_samples=args.num_samples,
@@ -105,7 +108,6 @@ def _cmd_collect(args: argparse.Namespace) -> None:
 
 def _cmd_noise(args: argparse.Namespace) -> None:
     """Execute the noise subcommand."""
-    from data_modules.noise_processor import NoiseProcessor
 
     processor = NoiseProcessor(
         data_root=args.data_root,
@@ -115,7 +117,6 @@ def _cmd_noise(args: argparse.Namespace) -> None:
 
 def _cmd_json(args: argparse.Namespace) -> None:
     """Execute the json subcommand."""
-    from data_modules.json_creation import JsonCreator
 
     creator = JsonCreator(data_root=args.data_root)
     creator.process_dataset()
@@ -123,9 +124,6 @@ def _cmd_json(args: argparse.Namespace) -> None:
 
 def _cmd_run_all(args: argparse.Namespace) -> None:
     """Execute all pipeline stages sequentially."""
-    from collect import DataCollector
-    from data_modules.noise_processor import NoiseProcessor
-    from data_modules.json_creation import JsonCreator
 
     logger.info("=" * 60)
     logger.info("STAGE 1: Data Collection")
