@@ -1,41 +1,71 @@
-"""This file implements a script node that subscribes to a ROS2 bbox topic,
-computes the 3D distance to a target, and applies grayscale brightness
-using an in-memory oscillation profile to the cube and line2 prims."""
+"""Apply grayscale thermal brightness to configured prims based on distance and oscillation."""
 
 from __future__ import annotations
 
+import logging
 import math
-from std_msgs.msg import Empty
 import random
-import rclpy
+import sys
 import threading
-from rclpy.node import Node
+from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+from std_msgs.msg import Empty
+import rclpy
 from isaac_ros2_messages.msg import FrameBboxes
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from typing import Optional
 import omni.usd
 from pxr import Gf, UsdGeom
 
+# Ensure the project root is importable
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-BBOX_TOPIC_NAME = "/isaac_core/bbox"
-TARGET_NAME = "Cube"
-CUBE_PRIM_PATH = "/bboxes/Cube"
-LINE_PRIM_PATH = "/World/line2"
+try:
+    from config import get_config
 
-OSCILLATION_MIN = -0.26
-OSCILLATION_MAX = 0.26
-OSCILLATION_NUM_VALUES_MIN = 300
-OSCILLATION_NUM_VALUES_MAX = 600
+    _cfg = get_config()
+    _grayscale = _cfg.grayscale
+    _oscillation_cfg = _cfg.grayscale_oscillation
+    _prims_cfg = _cfg.grayscale_prims
 
-RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
-NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
+    BBOX_TOPIC_NAME = _grayscale["bbox_topic_name"]
+    TARGET_NAME = _grayscale["target_name"]
+    RESET_OSCILLATION_TOPIC = _grayscale["reset_oscillation_topic"]
+    NEW_OSCILLATION_TOPIC = _grayscale["new_oscillation_topic"]
+    ALPHA = _grayscale["alpha"]
 
-ALPHA = 0.001  # thermal fading coefficient
+    OSCILLATION_MIN = _oscillation_cfg["min"]
+    OSCILLATION_MAX = _oscillation_cfg["max"]
+    OSCILLATION_NUM_VALUES_MIN = _oscillation_cfg["num_values_min"]
+    OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
+
+except Exception as e:
+    logger.warning("Failed to load TOML config, using fallback defaults: %s", e)
+    # Fallback defaults when running inside Isaac Sim without access to the TOML
+    BBOX_TOPIC_NAME = "/isaac_core/bbox"
+    TARGET_NAME = "Cube"
+    RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
+    NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
+    ALPHA = 0.001
+
+    OSCILLATION_MIN = -0.26
+    OSCILLATION_MAX = 0.26
+    OSCILLATION_NUM_VALUES_MIN = 300
+    OSCILLATION_NUM_VALUES_MAX = 600
+
+    _prims_cfg = [
+        {"path": "/bboxes/Cube", "default_gray": 0.5},
+        {"path": "/World/line2", "default_gray": 0.7},
+    ]
 
 
 def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> Optional[float]:
-    """Return 3D Euclidean distance to the target bbox."""
+    """Return the 3D Euclidean distance to the named target from a bbox message."""
     for bbox in msg.bboxes:
         if bbox.target_name == target_name:
             return math.sqrt(
@@ -47,13 +77,14 @@ def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> 
 
 
 def apply_thermal_fading(gray_value: float, distance: Optional[float], alpha: float = ALPHA) -> float:
-    """Apply exponential thermal fading."""
+    """Apply exponential thermal attenuation based on distance."""
     if distance is None:
         return gray_value
     return gray_value * math.exp(-alpha * distance)
 
 
 def generate_oscillation_values() -> list[float]:
+    """Generate a symmetric random oscillation profile."""
     num_values = random.randint(
         OSCILLATION_NUM_VALUES_MIN,
         OSCILLATION_NUM_VALUES_MAX,
@@ -68,9 +99,10 @@ def generate_oscillation_values() -> list[float]:
 
 
 class ROS2BboxNode:
-    """Subscribes to bbox topic and produces distance + oscillation offset."""
+    """Subscribe to bbox and oscillation control topics to produce distance and offset."""
 
     def __init__(self):
+        """Create the ROS2 node with bbox and control subscriptions."""
         self.node = rclpy.create_node("ros2_gray_scale_node")
         self.is_spinning = False
         self.bbox_subscriber = None
@@ -78,7 +110,7 @@ class ROS2BboxNode:
         self.qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=10
+            depth=10,
         )
 
         self.control_qos = QoSProfile(
@@ -94,6 +126,7 @@ class ROS2BboxNode:
         except rclpy.exceptions.ParameterAlreadyDeclaredException:
             pass
 
+        self._lock = threading.Lock()
         self.current_distance: Optional[float] = None
         self.current_offset: float = 0.0
 
@@ -114,80 +147,67 @@ class ROS2BboxNode:
             self.control_qos,
         )
 
-
     def bbox_callback(self, msg: FrameBboxes) -> None:
-        self.current_distance = get_distance_to_target(msg, TARGET_NAME)
+        """Update distance and advance the oscillation index on each bbox message."""
+        distance = get_distance_to_target(msg, TARGET_NAME)
 
-        if not self.oscillation_values:
-            return
+        with self._lock:
+            self.current_distance = distance
 
-        if self.oscillation_index >= len(self.oscillation_values):
-            self.oscillation_index = 0
+            if not self.oscillation_values:
+                return
 
-        self.current_offset = self.oscillation_values[self.oscillation_index]
-        self.oscillation_index += 1
+            if self.oscillation_index >= len(self.oscillation_values):
+                self.oscillation_index = 0
 
+            self.current_offset = self.oscillation_values[self.oscillation_index]
+            self.oscillation_index += 1
 
     def restart_oscillation_profile_callback(self, _: Empty) -> None:
-        """
-        Restart playback from the beginning of the current oscillation profile.
-        """
-
-        self.oscillation_index = 0
-
-        if self.oscillation_values:
-            self.current_offset = self.oscillation_values[0]
-        else:
-            self.current_offset = 0.0
-
+        """Reset the oscillation index to replay the current profile from the start."""
+        with self._lock:
+            self.oscillation_index = 0
+            self.current_offset = self.oscillation_values[0] if self.oscillation_values else 0.0
 
     def generate_new_oscillation_profile_callback(self, _: Empty) -> None:
-        """
-        Generate a new random oscillation profile and restart playback.
-        """
+        """Generate a new random oscillation profile and reset playback."""
+        new_values = generate_oscillation_values()
 
-        self.oscillation_values = generate_oscillation_values()
-        self.oscillation_index = 0
+        with self._lock:
+            self.oscillation_values = new_values
+            self.oscillation_index = 0
+            self.current_offset = new_values[0] if new_values else 0.0
 
-        if self.oscillation_values:
-            self.current_offset = self.oscillation_values[0]
-        else:
-            self.current_offset = 0.0
-
+    def get_state(self) -> tuple[Optional[float], float]:
+        """Return (distance, offset) as a consistent snapshot."""
+        with self._lock:
+            return self.current_distance, self.current_offset
 
     def subscribe(self):
-        """
-        Subscribe to bbox topic.
-        """
-
+        """Subscribe to the bbox topic and start spinning in a background thread."""
         if self.bbox_subscriber is None:
             self.bbox_subscriber = self.node.create_subscription(
                 FrameBboxes, BBOX_TOPIC_NAME, self.bbox_callback, self.qos_profile
             )
 
         if not self.is_spinning:
-            threading.Thread(target=self._spin, daemon=True).start()
+            self.executor.add_node(self.node)
+            threading.Thread(target=self.executor.spin, daemon=True).start()
             self.is_spinning = True
 
-    def _spin(self) -> None:
-        self.executor.add_node(self.node)
-        self.executor.spin()
 
-
-class CubeColorController:
-    """Handles grayscale updates for the cube prim."""
+class PrimColorController:
+    """Control the grayscale display color of a single USD prim."""
 
     def __init__(self, prim_path: str, default_gray: float = 0.5):
+        """Store the prim path and default gray value."""
         self.prim_path = prim_path
         self.default_gray = default_gray
         self.initialized = False
         self.base_gray = default_gray
 
     def initialize_base_gray(self, stage):
-        """
-        Initialize the base gray value from the cube prim's display color.
-        """
-
+        """Read the prim's current display color to establish the base gray."""
         prim = stage.GetPrimAtPath(self.prim_path)
 
         if not prim.IsValid():
@@ -198,63 +218,10 @@ class CubeColorController:
         colors = attr.Get()
 
         self.base_gray = colors[0][0] if colors else self.default_gray
-
         self.initialized = True
 
     def update(self, stage, offset: float, distance: Optional[float]):
-        """
-        Update the cube prim's color based on the current offset and distance.
-        """
-
-        prim = stage.GetPrimAtPath(self.prim_path)
-
-        if not prim.IsValid():
-            return
-
-        if not self.initialized:
-            self.initialize_base_gray(stage)
-
-        gray = self.base_gray + offset
-        gray = apply_thermal_fading(gray, distance)
-        gray = max(0.0, min(1.0, gray))
-
-        mesh = UsdGeom.Mesh(prim)
-        attr = mesh.CreateDisplayColorAttr()
-        attr.Set([Gf.Vec3f(gray, gray, gray)])
-
-
-class LineColorController:
-    """Handles grayscale updates for the line2 prim."""
-
-    def __init__(self, prim_path: str, default_gray: float = 0.7):
-        self.prim_path = prim_path
-        self.default_gray = default_gray
-        self.initialized = False
-        self.base_gray = default_gray
-
-    def initialize_base_gray(self, stage):
-        """
-        Initialize the base gray value from the line2 prim's display color.
-        """
-
-        prim = stage.GetPrimAtPath(self.prim_path)
-
-        if not prim.IsValid():
-            return
-
-        mesh = UsdGeom.Mesh(prim)
-        attr = mesh.CreateDisplayColorAttr()
-        colors = attr.Get()
-
-        self.base_gray = colors[0][0] if colors else self.default_gray
-
-        self.initialized = True
-
-    def update(self, stage, offset: float, distance: Optional[float]):
-        """
-        Update the line2 prim's color based on the current offset and distance.
-        """
-
+        """Compute and apply the new grayscale value to the prim."""
         prim = stage.GetPrimAtPath(self.prim_path)
 
         if not prim.IsValid():
@@ -273,6 +240,7 @@ class LineColorController:
 
 
 def setup(db):
+    """Initialize rclpy, the bbox node, and color controllers for all configured prims."""
     if not rclpy.ok():
         try:
             rclpy.init()
@@ -282,53 +250,55 @@ def setup(db):
     db.internal_state.ros2_bbox_node = ROS2BboxNode()
     db.internal_state.ros2_bbox_node.subscribe()
 
-    db.internal_state.cube_controller = CubeColorController(CUBE_PRIM_PATH, default_gray=0.5)
-    db.internal_state.line_controller = LineColorController(LINE_PRIM_PATH, default_gray=0.7)
+    db.internal_state.prim_controllers = [
+        PrimColorController(prim_cfg["path"], prim_cfg.get("default_gray", 0.5))
+        for prim_cfg in _prims_cfg
+    ]
 
 
 def compute(db):
-    """Apply grayscale updates to cube and line2 using shared oscillation."""
-
+    """Update all prim colors using the current oscillation offset and distance."""
     node = getattr(db.internal_state, "ros2_bbox_node", None)
-    cube_controller = getattr(db.internal_state, "cube_controller", None)
-    line_controller = getattr(db.internal_state, "line_controller", None)
+    controllers = getattr(db.internal_state, "prim_controllers", None)
 
-    if node is None or cube_controller is None or line_controller is None:
+    if node is None or not controllers:
         return True
 
     try:
         stage = omni.usd.get_context().get_stage()
 
-        print(
-            f"Distance={node.current_distance if node.current_distance else 'N/A'} | "
-            f"Offset={node.current_offset:+.4f}"
+        distance, offset = node.get_state()
+
+        logger.info(
+            "Distance=%s | Offset=%+.4f",
+            distance if distance else "N/A",
+            offset,
         )
 
-        # Both use the SAME offset and SAME fading
-        cube_controller.update(stage, node.current_offset, node.current_distance)
-        line_controller.update(stage, node.current_offset, node.current_distance)
+        for controller in controllers:
+            controller.update(stage, offset, distance)
 
     except Exception as e:
-        print(f"Failed to update colors: {e}")
+        logger.error("Failed to update colors: %s", e)
 
     return True
 
 
 def cleanup(db):
+    """Destroy the ROS2 node and shut down rclpy."""
     node = getattr(db.internal_state, "ros2_bbox_node", None)
 
     if node is not None:
         try:
             node.node.destroy_node()
         except Exception as e:
-            print(e)
+            logger.error("Error destroying ROS2 node: %s", e)
 
     if rclpy.ok():
         try:
             rclpy.shutdown()
         except Exception as e:
-            print(e)
+            logger.error("Error shutting down rclpy: %s", e)
 
     db.internal_state.ros2_bbox_node = None
-    db.internal_state.cube_controller = None
-    db.internal_state.line_controller = None
+    db.internal_state.prim_controllers = None

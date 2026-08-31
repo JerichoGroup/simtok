@@ -1,50 +1,37 @@
-#!/usr/bin/env python3
-"""
-Combines a pose pkl and a bbox pkl into a per-frame JSON file.
+"""Generate per-frame JSON metadata from pose and bbox pickle files."""
 
-Pose pkl structure: dict[frame_id (int) -> GeoPoseStamped msg]
-    GeoPoseStamped.pose.orientation stores RPY as: x=roll, y=pitch, z=yaw
+from __future__ import annotations
 
-Bbox pkl structure: dict[frame_id (int) -> FrameBboxes msg]
-    FrameBboxes.bboxes is a list of Bbox msgs, each with:
-        target_name, in_frame, is_visible, distance_x, distance_y, distance_z
-"""
-
-import argparse
 import json
+import logging
 import math
 import pickle
+import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+# Ensure the project root is importable
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from config import get_config
 
 
 def load_pkl(path: Path) -> Dict[int, Any]:
-    """Load a pickle file and return its contents."""
-    with path.open("rb") as f:
-        return pickle.load(f)
+    """Load and return the contents of a pickle file."""
+    with path.open("rb") as file:
+        return pickle.load(file)
 
 
 def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
-    """
-    Extract relevant fields from a single frame's pose and bbox messages.
-
-    Args:
-        pose_msg: A GeoPoseStamped message (orientation.y = pitch, orientation.z = yaw)
-        bbox_msg: A FrameBboxes message (bboxes list with distance and target info)
-
-    Returns:
-        Dictionary with per-frame data including pitch, yaw, and bbox target info.
-    """
-    # Extract orientation from pose (stored in radians, ENU frame)
-    # GeoPoseStamped: msg.pose.orientation where x=roll_enu, y=pitch_enu, z=yaw_enu
-    # Convert back to NED aircraft convention for output:
-    #   NED pitch = ENU roll (orientation.x)
-    #   NED yaw = -(yaw_enu - pi/2)
+    """Extract pitch, yaw, and target distances from a single frame's messages."""
     orientation = pose_msg.pose.orientation
     pitch = math.degrees(float(orientation.x))
     yaw_enu = float(orientation.z)
     yaw = math.degrees(-(yaw_enu - math.pi / 2))
-    # Normalise yaw to [-180, 180]
     yaw = (yaw + 180) % 360 - 180
 
     targets: List[Dict[str, Any]] = []
@@ -66,22 +53,15 @@ def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
             "distance_xyz": round(distance_xyz, 4),
         })
 
-    frame_entry = {
+    return {
         "pitch": pitch,
         "yaw": yaw,
         "targets": targets,
     }
 
-    return frame_entry
-
 
 def build_json(pose_data: Dict[int, Any], bbox_data: Dict[int, Any]) -> Dict[str, Any]:
-    """
-    Build the full JSON structure by iterating over all frames.
-
-    Aligns frames by frame_id (integer keys present in both pkls).
-    """
-    # Use frames that exist in both pkl files
+    """Build the full JSON structure from aligned pose and bbox frame data."""
     common_frames = sorted(set(pose_data.keys()) & set(bbox_data.keys()))
 
     if not common_frames:
@@ -101,127 +81,71 @@ def build_json(pose_data: Dict[int, Any], bbox_data: Dict[int, Any]) -> Dict[str
     }
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Combine all pose/bbox PKL pairs into per-frame JSON files."
-    )
-
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=Path("data"),
-        help="Dataset root directory.",
-    )
-
-    return parser.parse_args()
-
-
-def find_matching_bbox_file(
-    pose_file: Path,
-    bbox_directory: Path,
-) -> Path | None:
-    """Return the matching bbox PKL if it exists."""
-
+def find_matching_bbox_file(pose_file: Path, bbox_directory: Path) -> Path | None:
+    """Return the matching bbox PKL path if it exists, otherwise None."""
     bbox_file = bbox_directory / pose_file.name
-
     if not bbox_file.exists():
         return None
-
     return bbox_file
 
 
 def find_pose_files(pose_directory: Path) -> List[Path]:
-    """Return all pose PKL files."""
-
+    """Return all pose PKL files sorted from the given directory."""
     pose_files = sorted(pose_directory.glob("*.pkl"))
-
     if not pose_files:
         raise FileNotFoundError(
             f"No pose PKLs found in '{pose_directory}'."
         )
-
     return pose_files
 
 
-def write_json_file(
-    output_path: Path,
-    json_data: Dict[str, Any],
-) -> None:
-    """Write JSON data to disk."""
-
+def write_json_file(output_path: Path, json_data: Dict[str, Any]) -> None:
+    """Write a JSON dict to disk, creating parent directories as needed."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
     with output_path.open("w") as f:
         json.dump(json_data, f, indent=4)
 
 
-def process_pkl_pair(
-    pose_file: Path,
-    bbox_file: Path,
-    output_directory: Path,
-) -> None:
-    """Convert one pose/bbox pair into a JSON file."""
-
+def process_pkl_pair(pose_file: Path, bbox_file: Path, output_directory: Path) -> None:
+    """Convert one pose/bbox PKL pair into a JSON file."""
     pose_data = load_pkl(pose_file)
     bbox_data = load_pkl(bbox_file)
 
     result = build_json(pose_data, bbox_data)
 
     output_path = output_directory / f"{pose_file.stem}.json"
-
     write_json_file(output_path, result)
 
-    print(
-        f"[json_creation] "
-        f"Wrote {result['total_frames']} frames to {output_path}"
+    logger.info(
+        "[json_creation] Wrote %d frames to %s",
+        result['total_frames'],
+        output_path,
     )
 
 
-def process_dataset(data_root: Path) -> None:
-    """Generate JSON files for the entire dataset."""
+class JsonCreator:
+    """Generate per-frame JSON metadata for the entire dataset."""
 
-    pose_directory = data_root / "poses"
-    bbox_directory = data_root / "bboxes"
-    json_directory = data_root / "jsons"
+    def __init__(self, data_root: Optional[Path] = None) -> None:
+        """Initialize the creator, prioritizing explicit data_root over TOML config."""
+        cfg = get_config()
+        paths = cfg.paths
 
-    pose_files = find_pose_files(pose_directory)
+        resolved_root = data_root if data_root is not None else Path(paths["data_root"])
 
-    for pose_file in pose_files:
+        self._pose_dir: Path = resolved_root / "poses"
+        self._bbox_dir: Path = resolved_root / "bboxes"
+        self._json_dir: Path = resolved_root / "jsons"
 
-        bbox_file = find_matching_bbox_file(
-            pose_file,
-            bbox_directory,
-        )
+    def process_dataset(self) -> None:
+        """Generate JSON files for all matching pose/bbox pairs in the dataset."""
+        pose_files = find_pose_files(self._pose_dir)
 
-        if bbox_file is None:
-            print(f"[WARNING] Missing bbox file: {pose_file.name}")
-            continue
+        for pose_file in pose_files:
+            bbox_file = find_matching_bbox_file(pose_file, self._bbox_dir)
 
-        process_pkl_pair(
-            pose_file,
-            bbox_file,
-            json_directory,
-        )
+            if bbox_file is None:
+                logger.warning("Missing bbox file: %s", pose_file.name)
+                continue
 
-
-def find_matching_bbox_file(
-    pose_file: Path,
-    bbox_directory: Path,
-) -> Path | None:
-    """Return the matching bbox PKL if it exists."""
-
-    bbox_file = bbox_directory / pose_file.name
-
-    if not bbox_file.exists():
-        return None
-
-    return bbox_file
-
-
-def main() -> None:
-    args = parse_args()
-    process_dataset(args.data_root)
-
-
-if __name__ == "__main__":
-    main()
+            process_pkl_pair(pose_file, bbox_file, self._json_dir)
