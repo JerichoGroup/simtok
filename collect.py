@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -183,7 +183,7 @@ class DataCollector:
         camera.move_to_point(
             pov.lat, pov.lon, pov.alt,
             self._default_roll, self._default_pitch, self._default_yaw,
-            look_at_target=False,
+            look_at_target=False, duration_s= 0, turn_duration_s= 0
         )
         camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
 
@@ -219,10 +219,10 @@ class DataCollector:
         pose.stop_capture()
         video.stop_capture()
 
-    def _save_recording(self, sample_id: int, pov: PovConfig, video, pose, bbox) -> None:
+    def _save_recording(self, sample_id: int, pov: PovConfig, video, pose, bbox, fps: float) -> None:
         """Save captured data to disk for a given sample and POV."""
         prefix = self._build_filename_prefix(sample_id, pov)
-        video.save_data_to(str(self._video_dir / f"{prefix}.mp4"), self._video_fps)
+        video.save_data_to(str(self._video_dir / f"{prefix}.mp4"), fps)
         pose.save_data_to(str(self._pose_dir / f"{prefix}.pkl"))
         bbox.save_data_to(str(self._bbox_dir / f"{prefix}.pkl"))
 
@@ -233,10 +233,13 @@ class DataCollector:
         logger.info("Recording dataset sample %03d | POV %d", sample_id, pov.id)
         self._move_camera(camera, pov, zoom_commander)
         self._publish_oscillation(reset_pub)
+        start_time = time()
         self._start_recording(video, pose, bbox)
         sleep(self._video_duration_sec)
         self._stop_recording(video, pose, bbox)
-        self._save_recording(sample_id, pov, video, pose, bbox)
+        elapsed = time() - start_time
+        actual_fps = len(video.frames) / elapsed if elapsed > 0 else self._video_fps
+        self._save_recording(sample_id, pov, video, pose, bbox, actual_fps)
 
     def _generate_dataset(self, camera, video, pose, bbox, reset_pub, new_pub, zoom_commander) -> None:
         """Generate all dataset samples across all configured POVs."""
