@@ -68,9 +68,7 @@ class GaussianNoise(NoiseModel):
             config["gaussian_noise_std"]
             + (image / 255.0) * config["gaussian_noise_signal_multiplier"]
         )
-
         noise = np.random.normal(0, sigma)
-
         return image + noise
 
 
