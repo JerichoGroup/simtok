@@ -168,3 +168,4 @@ class LowResolutionNoise(NoiseModel):
             (w, h),
             interpolation=cv2.INTER_LINEAR,
         )
+
