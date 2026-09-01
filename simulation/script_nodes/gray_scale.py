@@ -5,9 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import random
-import sys
 import threading
-from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -20,48 +18,23 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import omni.usd
 from pxr import Gf, UsdGeom
 
-# Ensure the project root is importable
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+from config import get_config
 
-try:
-    from config import get_config
+_config = get_config()
+_grayscale = _config.grayscale
+_oscillation_config = _config.grayscale_oscillation
+_prims_config = _config.grayscale_prims
 
-    _cfg = get_config()
-    _grayscale = _cfg.grayscale
-    _oscillation_cfg = _cfg.grayscale_oscillation
-    _prims_cfg = _cfg.grayscale_prims
+BBOX_TOPIC_NAME = _grayscale["bbox_topic_name"]
+TARGET_NAME = _grayscale["target_name"]
+RESET_OSCILLATION_TOPIC = _grayscale["reset_oscillation_topic"]
+NEW_OSCILLATION_TOPIC = _grayscale["new_oscillation_topic"]
+ALPHA = _grayscale["alpha"]
 
-    BBOX_TOPIC_NAME = _grayscale["bbox_topic_name"]
-    TARGET_NAME = _grayscale["target_name"]
-    RESET_OSCILLATION_TOPIC = _grayscale["reset_oscillation_topic"]
-    NEW_OSCILLATION_TOPIC = _grayscale["new_oscillation_topic"]
-    ALPHA = _grayscale["alpha"]
-
-    OSCILLATION_MIN = _oscillation_cfg["min"]
-    OSCILLATION_MAX = _oscillation_cfg["max"]
-    OSCILLATION_NUM_VALUES_MIN = _oscillation_cfg["num_values_min"]
-    OSCILLATION_NUM_VALUES_MAX = _oscillation_cfg["num_values_max"]
-
-except Exception as e:
-    logger.warning("Failed to load TOML config, using fallback defaults: %s", e)
-    # Fallback defaults when running inside Isaac Sim without access to the TOML
-    BBOX_TOPIC_NAME = "/isaac_core/bbox"
-    TARGET_NAME = "Cube"
-    RESET_OSCILLATION_TOPIC = "/simtok/reset_oscillation"
-    NEW_OSCILLATION_TOPIC = "/simtok/new_oscillation"
-    ALPHA = 0.001
-
-    OSCILLATION_MIN = -0.26
-    OSCILLATION_MAX = 0.26
-    OSCILLATION_NUM_VALUES_MIN = 300
-    OSCILLATION_NUM_VALUES_MAX = 600
-
-    _prims_cfg = [
-        {"path": "/bboxes/Cube", "default_gray": 0.5},
-        {"path": "/World/line2", "default_gray": 0.7},
-    ]
+OSCILLATION_MIN = _oscillation_config["min"]
+OSCILLATION_MAX = _oscillation_config["max"]
+OSCILLATION_NUM_VALUES_MIN = _oscillation_config["num_values_min"]
+OSCILLATION_NUM_VALUES_MAX = _oscillation_config["num_values_max"]
 
 
 def get_distance_to_target(msg: FrameBboxes, target_name: str = TARGET_NAME) -> Optional[float]:
@@ -251,8 +224,8 @@ def setup(db):
     db.internal_state.ros2_bbox_node.subscribe()
 
     db.internal_state.prim_controllers = [
-        PrimColorController(prim_cfg["path"], prim_cfg.get("default_gray", 0.5))
-        for prim_cfg in _prims_cfg
+        PrimColorController(prim_config["path"], prim_config.get("default_gray", 0.5))
+        for prim_config in _prims_config
     ]
 
 

@@ -9,15 +9,23 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from pxr import UsdGeom
 from std_msgs.msg import Float32
 
-CAMERA_PRIM_PATH = "/Environment/udp_camera/Xform/main_camera_01"
-ZOOM_TOPIC = "/simtok/zoom"
-SENSOR_WIDTH_MM = 5.57          # e.g. a 1/2.8" sensor
-SENSOR_HEIGHT_MM = 3.13
-HFOV_WIDE_DEG = 65.0            # at zoom = 0.0
-HFOV_TELE_DEG = 7.2             # at zoom = 1.0
-ZOOM_CURVE = "geometric"        # "geometric" | "linear"
-ZOOM_LOG_PATH = "/tmp/zoom_node.log"
-LOG_EVERY_S = 5.0               # heartbeat period when nothing is changing
+from config import get_config
+
+_cfg = get_config()
+_zoom = _cfg.zoom
+_sensor = _cfg.zoom_sensor
+_hfov = _cfg.zoom_hfov
+_logging = _cfg.zoom_logging
+
+CAMERA_PRIM_PATH = _zoom["camera_prim_path"]
+ZOOM_TOPIC = _zoom["zoom_topic"]
+ZOOM_CURVE = _zoom["zoom_curve"]        # "geometric" | "linear"
+SENSOR_WIDTH_MM = _sensor["width_mm"]
+SENSOR_HEIGHT_MM = _sensor["height_mm"]
+HFOV_WIDE_DEG = _hfov["wide_deg"]       # at zoom = 0.0
+HFOV_TELE_DEG = _hfov["tele_deg"]       # at zoom = 1.0
+ZOOM_LOG_PATH = _logging["log_path"]
+LOG_EVERY_S = _logging["log_every_sec"]  # heartbeat period when nothing is changing
 
 
 def _focal_length_for_hfov(hfov_deg, aperture_mm=SENSOR_WIDTH_MM):

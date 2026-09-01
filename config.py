@@ -91,6 +91,34 @@ class SimtokConfig:
         """Return the [[grayscale.prims]] array of tables."""
         return list(self._data.get("grayscale", {}).get("prims", []))
 
+    @property
+    def zoom(self) -> Dict[str, Any]:
+        """Return the [zoom] section scalars without sub-tables."""
+        section = dict(self._data.get("zoom", {}))
+        for sub in ("sensor", "hfov", "slew", "logging"):
+            section.pop(sub, None)
+        return section
+
+    @property
+    def zoom_sensor(self) -> Dict[str, float]:
+        """Return the [zoom.sensor] section."""
+        return dict(self._data.get("zoom", {}).get("sensor", {}))
+
+    @property
+    def zoom_hfov(self) -> Dict[str, float]:
+        """Return the [zoom.hfov] section."""
+        return dict(self._data.get("zoom", {}).get("hfov", {}))
+
+    @property
+    def zoom_slew(self) -> Dict[str, float]:
+        """Return the [zoom.slew] section."""
+        return dict(self._data.get("zoom", {}).get("slew", {}))
+
+    @property
+    def zoom_logging(self) -> Dict[str, Any]:
+        """Return the [zoom.logging] section."""
+        return dict(self._data.get("zoom", {}).get("logging", {}))
+
     # ------------------------------------------------------------------
     # Generic access
     # ------------------------------------------------------------------

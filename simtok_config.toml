@@ -106,3 +106,28 @@ default_gray = 0.5
 [[grayscale.prims]]
 path = "/World/line2"
 default_gray = 0.7
+
+# =============================================================================
+# Zoom Script Node (Isaac Sim) + Zoom Manager (host)
+# =============================================================================
+
+[zoom]
+zoom_topic = "/simtok/zoom"
+camera_prim_path = "/Environment/udp_camera/Xform/main_camera_01"
+zoom_curve = "geometric"        # "geometric" | "linear"
+
+[zoom.sensor]
+width_mm = 5.57                 # e.g. a 1/2.8" sensor
+height_mm = 3.13
+
+[zoom.hfov]
+wide_deg = 65.0                 # at zoom = 0.0
+tele_deg = 7.2                  # at zoom = 1.0
+
+[zoom.slew]
+duration_sec = 4.0
+hz = 20.0
+
+[zoom.logging]
+log_path = "/tmp/zoom_node.log"
+log_every_sec = 5.0             # heartbeat period when nothing is changing

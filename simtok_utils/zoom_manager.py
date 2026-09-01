@@ -7,8 +7,14 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
 
+from config import get_config
 
-DEFAULT_ZOOM_TOPIC = "/simtok/zoom"
+_zoom_config = get_config().zoom
+_slew_config = get_config().zoom_slew
+
+DEFAULT_ZOOM_TOPIC = _zoom_config["zoom_topic"]
+DEFAULT_SLEW_DURATION_SEC = _slew_config["duration_sec"]
+DEFAULT_SLEW_HZ = _slew_config["hz"]
 
 
 class ZoomPublisher:
@@ -77,8 +83,8 @@ class ZoomSlewer:
     def slew_to(
         self,
         target: float,
-        duration_sec: float = 4.0,
-        hz: float = 20.0,
+        duration_sec: float = DEFAULT_SLEW_DURATION_SEC,
+        hz: float = DEFAULT_SLEW_HZ,
     ) -> threading.Thread:
 
         target = max(0.0, min(1.0, float(target)))
@@ -162,8 +168,8 @@ class ZoomCommander:
     def slew_to(
         self,
         target: float,
-        duration_sec: float = 4.0,
-        hz: float = 20.0,
+        duration_sec: float = DEFAULT_SLEW_DURATION_SEC,
+        hz: float = DEFAULT_SLEW_HZ,
     ) -> threading.Thread:
         return self._slewer.slew_to(
             target,
