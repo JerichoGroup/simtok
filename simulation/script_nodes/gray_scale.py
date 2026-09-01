@@ -258,7 +258,7 @@ def compute(db):
 
 
 def cleanup(db):
-    """Destroy the ROS2 node and shut down rclpy."""
+    """Destroy the ROS2 node."""
     node = getattr(db.internal_state, "ros2_bbox_node", None)
 
     if node is not None:

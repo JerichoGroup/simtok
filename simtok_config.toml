@@ -68,11 +68,11 @@ dead_pixel_rate = 0.00010
 sensor_drift_std = 0.02
 
 [noise.toggles]
-enable_fixed_pattern = false
-enable_temporal_noise = false
+enable_fixed_pattern = true
+enable_temporal_noise = true
 enable_gaussian_noise = true
-enable_blur = false
-enable_agc = false
+enable_blur = true
+enable_agc = true
 enable_low_resolution = true
 enable_sensor_drift = true
 enable_hot_pixels = true

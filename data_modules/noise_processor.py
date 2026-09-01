@@ -109,28 +109,19 @@ class ThermalVideoPipeline:
 
     def _build_noise_models(self, width: int, height: int) -> List[NoiseModel]:
         """Build the list of active noise models based on config toggles."""
-        models: List[NoiseModel] = []
+        model_factories = {
+            "enable_blur": lambda: ThermalBlurNoise(),
+            "enable_fixed_pattern": lambda: FixedPatternNoise(width, height),
+            "enable_gaussian_noise": lambda: GaussianNoise(),
+            "enable_temporal_noise": lambda: TemporalNoise(),
+            "enable_low_resolution": lambda: LowResolutionNoise(),
+            "enable_agc": lambda: AGCNoise(),
+            "enable_sensor_drift": lambda: SensorDriftNoise(),
+            "enable_hot_pixels": lambda: HotPixelsNoise(width, height),
+            "enable_dead_pixels": lambda: DeadPixelsNoise(width, height),
+        }
 
-        if config["enable_blur"]:
-            models.append(ThermalBlurNoise())
-        if config["enable_fixed_pattern"]:
-            models.append(FixedPatternNoise(width, height))
-        if config["enable_gaussian_noise"]:
-            models.append(GaussianNoise())
-        if config["enable_temporal_noise"]:
-            models.append(TemporalNoise())
-        if config["enable_low_resolution"]:
-            models.append(LowResolutionNoise())
-        if config["enable_agc"]:
-            models.append(AGCNoise())
-        if config["enable_sensor_drift"]:
-            models.append(SensorDriftNoise())
-        if config["enable_hot_pixels"]:
-            models.append(HotPixelsNoise(width, height))
-        if config["enable_dead_pixels"]:
-            models.append(DeadPixelsNoise(width, height))
-
-        return models
+        return [factory() for toggle, factory in model_factories.items() if config[toggle]]
 
     def run(self, input_video: str, output_video: str) -> None:
         """Process all frames from input and write the noised output."""
