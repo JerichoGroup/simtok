@@ -12,16 +12,21 @@ config = get_config().noise_flat
 class NoiseModel(ABC):
     """Define the abstract interface for all noise models."""
 
-    @abstractmethod
     def process(self, image: np.ndarray) -> np.ndarray:
-        """Apply the noise effect to an image and return the result."""
+        """Coerce to the common working dtype, apply the model, return float32."""
+        result = self._apply(np.asarray(image, dtype=np.float32))
+        return np.asarray(result, dtype=np.float32)
+
+    @abstractmethod
+    def _apply(self, image: np.ndarray) -> np.ndarray:
+        """Apply the noise effect to a float32 image and return the result."""
         pass
 
 
 class ThermalBlurNoise(NoiseModel):
     """Simulate thermal diffusion via Gaussian blur."""
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Apply Gaussian blur to the image."""
         return cv2.GaussianBlur(image, (0, 0), config["blur_sigma"])
 
@@ -46,7 +51,7 @@ class FixedPatternNoise(NoiseModel):
             + row_noise[:, np.newaxis]
         ).astype(np.float32)
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Add the drifting fixed pattern to the image."""
         self.pattern += np.random.normal(
             0,
@@ -60,7 +65,7 @@ class FixedPatternNoise(NoiseModel):
 class GaussianNoise(NoiseModel):
     """Simulate signal-dependent Gaussian read noise."""
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Add signal-dependent Gaussian noise to the image."""
         image = np.clip(image, 0, 255)
 
@@ -75,7 +80,7 @@ class GaussianNoise(NoiseModel):
 class TemporalNoise(NoiseModel):
     """Simulate frame-to-frame temporal noise."""
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Add random temporal noise to the image."""
         noise = np.random.normal(
             0,
@@ -96,12 +101,9 @@ class HotPixelsNoise(NoiseModel):
             < config["hot_pixel_rate"]
         )
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Add hot pixel intensity at masked locations."""
-        result = image.copy()
-        result[self.mask] += config["hot_pixel_intensity"]
-
-        return result
+        return image + self.mask * config["hot_pixel_intensity"]
 
 
 class SensorDriftNoise(NoiseModel):
@@ -111,7 +113,7 @@ class SensorDriftNoise(NoiseModel):
         """Initialize the cumulative drift offset to zero."""
         self.offset: float = 0.0
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Apply cumulative drift offset to the image."""
         self.offset += np.random.normal(0, config["sensor_drift_std"])
 
@@ -128,7 +130,7 @@ class DeadPixelsNoise(NoiseModel):
             < config["dead_pixel_rate"]
         )
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Zero out pixel values at masked locations."""
         result = image.copy()
         result[self.mask] = 0
@@ -139,7 +141,7 @@ class DeadPixelsNoise(NoiseModel):
 class AGCNoise(NoiseModel):
     """Simulate automatic gain control via histogram normalization."""
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Normalize the image histogram to the full 0-255 range."""
         return cv2.normalize(
             image,
@@ -153,7 +155,7 @@ class AGCNoise(NoiseModel):
 class LowResolutionNoise(NoiseModel):
     """Simulate low sensor resolution via downsample and upsample."""
 
-    def process(self, image: np.ndarray) -> np.ndarray:
+    def _apply(self, image: np.ndarray) -> np.ndarray:
         """Downsample the image by half and upsample back to original size."""
         h, w = image.shape
 
