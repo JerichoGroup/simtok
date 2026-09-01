@@ -267,11 +267,5 @@ def cleanup(db):
         except Exception as e:
             logger.error("Error destroying ROS2 node: %s", e)
 
-    if rclpy.ok():
-        try:
-            rclpy.shutdown()
-        except Exception as e:
-            logger.error("Error shutting down rclpy: %s", e)
-
     db.internal_state.ros2_bbox_node = None
     db.internal_state.prim_controllers = None
