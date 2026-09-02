@@ -14,7 +14,7 @@ from std_msgs.msg import Empty
 import rclpy
 from isaac_ros2_messages.msg import FrameBboxes
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 import omni.usd
 from pxr import Gf, UsdGeom
 
@@ -88,6 +88,7 @@ class ROS2BboxNode:
 
         self.control_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )

@@ -12,7 +12,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 import rclpy
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from std_msgs.msg import Empty
 
 import isaac_core_dev_kit.dev_utils as core_utils
@@ -200,12 +200,13 @@ class DataCollector:
 
     @staticmethod
     def _publish_oscillation(publisher) -> None:
-        """Publish an oscillation control command twice to ensure delivery."""
-        msg = Empty()
-        for _ in range(2):
-            publisher.publish(msg)
-            sleep(0.05)
-        sleep(0.2)
+        """Publish an oscillation control command.
+
+        Delivery is guaranteed by the RELIABLE + TRANSIENT_LOCAL QoS on the
+        publisher: the sample is latched and delivered even to a subscriber
+        that matches slightly after the publish call.
+        """
+        publisher.publish(Empty())
 
     def _start_recording(self, video, pose, bbox) -> None:
         """Start capture on all recording nodes."""
@@ -266,6 +267,7 @@ class DataCollector:
         node = rclpy.create_node("oscillation_control_publisher")
         qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
