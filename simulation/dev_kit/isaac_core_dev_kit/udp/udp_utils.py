@@ -20,7 +20,6 @@ class LLAPoint:
 
 # ==================== Helper - lla to distance m ====================
 def lla_distance_to_meters(p1: LLAPoint, p2: LLAPoint) -> float:
-# def distance_between_lla_points_m(p1: LLAPoint, p2: LLAPoint) -> float:
     """Compute distance in meters between two LLA points."""
 
 
