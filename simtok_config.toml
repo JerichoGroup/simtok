@@ -54,6 +54,7 @@ zoom = 0.0
 # =============================================================================
 
 [noise]
+max_workers = 0                 # parallel video workers; 0 = auto (min(num_videos, cpu_count))
 gaussian_noise_std = 2.0
 gaussian_noise_signal_multiplier = 4.0
 temporal_noise_std = 1.5

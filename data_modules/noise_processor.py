@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import cv2
 import numpy as np
@@ -175,34 +178,65 @@ def build_output_video_path(output_directory: Path, input_video: Path) -> Path:
     return output_directory / input_video.name
 
 
+def _process_video_worker(input_video: str, output_video: str) -> str:
+    """Process a single video in its own process and return the output path.
+
+    Defined at module level so it is picklable under any multiprocessing
+    start method (fork or spawn). It builds its own pipeline; only path
+    strings cross the process boundary.
+    """
+    ThermalVideoPipeline().run(input_video, output_video)
+    return output_video
+
+
 class NoiseProcessor:
     """Apply thermal noise to all videos in a dataset directory."""
 
     def __init__(
         self,
         data_root: Optional[Path] = None,
+        max_workers: Optional[int] = None,
     ) -> None:
-        """Initialize the processor, prioritizing explicit data_root over TOML config."""
+        """Initialize the processor, prioritizing explicit args over TOML config."""
         cfg = get_config()
         paths = cfg.paths
+        noise_cfg = cfg.noise
 
         resolved_root = data_root if data_root is not None else Path(paths["data_root"])
 
         self.video_directory: Path = resolved_root / "videos"
         self.output_directory: Path = resolved_root / "noise_videos"
+        self._max_workers: int = (
+            max_workers if max_workers is not None else int(noise_cfg.get("max_workers", 0))
+        )
         self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
-        """Apply thermal noise to every video in the input directory."""
+        """Apply thermal noise to every video in the input directory, in parallel."""
         self.output_directory.mkdir(parents=True, exist_ok=True)
         video_files = find_video_files(self.video_directory)
 
-        for video_file in video_files:
-            output_video = build_output_video_path(
-                self.output_directory,
-                video_file,
+        jobs = [
+            (
+                str(video_file),
+                str(build_output_video_path(self.output_directory, video_file)),
             )
-            self.process_video(video_file, output_video)
+            for video_file in video_files
+        ]
+
+        worker_count = self._max_workers or min(len(jobs), os.cpu_count() or 1)
+        logger.info("Processing %d videos across %d workers", len(jobs), worker_count)
+
+        with ProcessPoolExecutor(max_workers=worker_count) as executor:
+            future_to_input = {
+                executor.submit(_process_video_worker, input_video, output_video): input_video
+                for input_video, output_video in jobs
+            }
+
+            for future in as_completed(future_to_input):
+                input_video = future_to_input[future]
+                future.result()  # re-raise any worker exception
+                logger.info("Finished %s", Path(input_video).name)
 
     def process_video(self, input_video: Path, output_video: Path) -> None:
         """Process a single video file with thermal noise."""
