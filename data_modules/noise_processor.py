@@ -209,7 +209,6 @@ class NoiseProcessor:
         self._max_workers: int = (
             max_workers if max_workers is not None else int(noise_cfg.get("max_workers", 0))
         )
-        self._pipeline = ThermalVideoPipeline()
 
     def process_dataset(self) -> None:
         """Apply thermal noise to every video in the input directory, in parallel."""
@@ -237,10 +236,3 @@ class NoiseProcessor:
                 input_video = future_to_input[future]
                 future.result()  # re-raise any worker exception
                 logger.info("Finished %s", Path(input_video).name)
-
-    def process_video(self, input_video: Path, output_video: Path) -> None:
-        """Process a single video file with thermal noise."""
-        logger.info("Input : %s", input_video.name)
-        logger.info("Output: %s", output_video.name)
-
-        self._pipeline.run(str(input_video), str(output_video))
