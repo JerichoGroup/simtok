@@ -17,7 +17,7 @@ usd_path = "usd/maps/scenes/cube.usda"
 
 [collect]
 num_samples = 1
-video_duration_sec = 60
+video_duration_sec = 3
 video_fps = 20
 initial_scene_load_time_sec = 5
 camera_settle_time_sec = 2
@@ -36,15 +36,15 @@ id = 1
 lat = 32.123269
 lon = 35.1232421
 alt = 0.0
-move_up_m = 5.0
-pitch_deg = -15.0
+move_up_m = 0.0
+pitch_deg = 0.0
 zoom = 0.5
 
 [[collect.povs]]
 id = 2
-lat = 32.1234500
+lat = 32.12345
 lon = 35.1233561
-alt = 0.0
+alt = 5.0
 move_up_m = 0.0
 pitch_deg = 0.0
 zoom = 0.0

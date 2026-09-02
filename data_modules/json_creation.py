@@ -29,7 +29,7 @@ def load_pkl(path: Path) -> Dict[int, Any]:
 def extract_frame_data(pose_msg: Any, bbox_msg: Any) -> Dict[str, Any]:
     """Extract pitch, yaw, and target distances from a single frame's messages."""
     orientation = pose_msg.pose.orientation
-    pitch = math.degrees(float(orientation.x))
+    pitch = math.degrees(float(orientation.y))
     yaw_enu = float(orientation.z)
     yaw = math.degrees(-(yaw_enu - math.pi / 2))
     yaw = (yaw + 180) % 360 - 180

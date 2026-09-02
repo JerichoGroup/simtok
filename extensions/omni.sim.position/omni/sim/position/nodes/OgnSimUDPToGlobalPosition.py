@@ -34,8 +34,8 @@ def convert_ned_to_enu(roll_ned: float, pitch_ned: float, yaw_ned: float) -> tup
     Returns:
         Angles in ENU.
     """
-    roll_enu = pitch_ned
-    pitch_enu = roll_ned
+    roll_enu = roll_ned
+    pitch_enu = -pitch_ned
     yaw_enu = -yaw_ned + math.pi / 2
 
     # Normalise to [-pi, pi]

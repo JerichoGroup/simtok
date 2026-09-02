@@ -5,7 +5,7 @@ These tests cover only pure input->output logic (no disk I/O, no ROS, no config)
     - build_json: frame-ID intersection, structure, and error handling
 
 Messages are faked with SimpleNamespace since the functions rely only on
-attribute access (pose_msg.pose.orientation.x, bbox_msg.bboxes[].distance_x).
+attribute access (pose_msg.pose.orientation.y, bbox_msg.bboxes[].distance_x).
 """
 
 import math
@@ -32,7 +32,7 @@ def make_pose(orientation_x=0.0, orientation_y=0.0, orientation_z=0.0):
 
     NOTE: orientation here carries Euler angles (radians), not a quaternion —
     the upstream publisher stuffs roll/pitch/yaw into x/y/z. extract_frame_data
-    reads .x as pitch and .z as yaw (ENU).
+    reads .y as pitch and .z as yaw (ENU).
     """
     orientation = SimpleNamespace(x=orientation_x, y=orientation_y, z=orientation_z, w=1.0)
     pose = SimpleNamespace(orientation=orientation)
@@ -103,8 +103,8 @@ def test_yaw_is_wrapped_into_180_range():
     ],
 )
 def test_pitch_radians_to_degrees(pitch_rad, expected_pitch_deg):
-    """Pitch (read from orientation.x) is a plain radians->degrees conversion."""
-    result = extract_frame_data(make_pose(orientation_x=pitch_rad), make_bbox_msg())
+    """Pitch (read from orientation.y) is a plain radians->degrees conversion."""
+    result = extract_frame_data(make_pose(orientation_y=pitch_rad), make_bbox_msg())
     assert result["pitch"] == pytest.approx(expected_pitch_deg, abs=1e-9)
 
 
@@ -201,7 +201,7 @@ def test_build_json_frame_keys_are_strings():
 
 def test_build_json_structure():
     """Top-level structure has total_frames and a frames dict."""
-    pose_data = {0: make_pose(orientation_x=math.pi / 6, orientation_z=0.0)}
+    pose_data = {0: make_pose(orientation_y=math.pi / 6, orientation_z=0.0)}
     bbox_data = {0: make_bbox_msg(make_bbox(distance_x=3.0, distance_y=4.0, distance_z=12.0))}
 
     result = build_json(pose_data, bbox_data)
