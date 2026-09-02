@@ -36,7 +36,6 @@ class PovConfig:
     forward_m: float = 0.0
     right_m: float = 0.0
     up_m: float = 0.0
-    pitch_deg: float = 0.0
     zoom: float = 0.0
 
 
@@ -88,7 +87,6 @@ class DataCollector:
                     forward_m=pov.get("forward_m", 0.0),
                     right_m=pov.get("right_m", 0.0),
                     up_m=pov.get("up_m", 0.0),
-                    pitch_deg=pov.get("pitch_deg", 0.0),
                     zoom=pov.get("zoom", 0.0),
                 )
                 for pov in config.collect_povs
@@ -203,9 +201,6 @@ class DataCollector:
             camera.move_up_down(pov.up_m, duration_s=0)
 
         camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
-
-        if pov.pitch_deg:
-            camera.turn_pitch(pov.pitch_deg)
 
         zoom_commander.set_zoom(pov.zoom)
 
