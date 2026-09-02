@@ -33,10 +33,9 @@ class PovConfig:
     """Store a single camera point-of-view configuration."""
 
     id: int
-    lat: float
-    lon: float
-    alt: float
-    move_up_m: float = 0.0
+    forward_m: float = 0.0
+    right_m: float = 0.0
+    up_m: float = 0.0
     pitch_deg: float = 0.0
     zoom: float = 0.0
 
@@ -67,7 +66,6 @@ class DataCollector:
 
         self._initial_scene_load_time_sec: int = collect["initial_scene_load_time_sec"]
         self._camera_settle_time_sec: int = collect["camera_settle_time_sec"]
-        self._vertical_move_settle_time_sec: float = collect["vertical_move_settle_time_sec"]
 
         root = Path(data_root) if data_root is not None else Path(paths["data_root"])
         self._video_dir: Path = root / "videos"
@@ -87,10 +85,9 @@ class DataCollector:
             self._povs = [
                 PovConfig(
                     id=pov["id"],
-                    lat=pov["lat"],
-                    lon=pov["lon"],
-                    alt=pov["alt"],
-                    move_up_m=pov.get("move_up_m", 0.0),
+                    forward_m=pov.get("forward_m", 0.0),
+                    right_m=pov.get("right_m", 0.0),
+                    up_m=pov.get("up_m", 0.0),
                     pitch_deg=pov.get("pitch_deg", 0.0),
                     zoom=pov.get("zoom", 0.0),
                 )
@@ -179,17 +176,33 @@ class DataCollector:
         return f"sample_{sample_id:03d}_pov_{pov.id}"
 
     def _move_camera(self, camera: UdpBot, pov: PovConfig, zoom_commander: ZoomCommander) -> None:
-        """Move the camera to the given POV and orient it toward the target."""
-        camera.move_to_point(
-            pov.lat, pov.lon, pov.alt,
-            self._default_roll, self._default_pitch, self._default_yaw,
-            look_at_target=False, duration_s= 0, turn_duration_s= 0
-        )
-        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
+        """Move the camera to the given POV and orient it toward the target.
 
-        if pov.move_up_m:
-            camera.move_up_down(pov.move_up_m)
-            sleep(self._vertical_move_settle_time_sec)
+        Start co-located with the target using the default orientation, then
+        displace by the POV's relative offsets while keeping that orientation
+        fixed, then turn to look back at the target. Relative moves are
+        immediate (duration_s=0).
+
+        The reset uses look_at_target=True with turn_duration_s=0 so that
+        move_to_point's trailing _turn_to() restores the camera to the default
+        orientation (yaw) before the relative moves. Without this the camera
+        would retain the heading left by the previous POV's turn_to_point, and
+        the yaw-dependent forward/right moves would accumulate rotation error.
+        """
+        camera.move_to_point(
+            self._target_lat, self._target_lon, self._target_alt,
+            self._default_roll, self._default_pitch, self._default_yaw,
+            look_at_target=True, duration_s=0, turn_duration_s=0
+        )
+
+        if pov.forward_m:
+            camera.move_forward_backward(pov.forward_m, duration_s=0)
+        if pov.right_m:
+            camera.move_right_left(pov.right_m, duration_s=0)
+        if pov.up_m:
+            camera.move_up_down(pov.up_m, duration_s=0)
+
+        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
 
         if pov.pitch_deg:
             camera.turn_pitch(pov.pitch_deg)
