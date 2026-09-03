@@ -50,27 +50,49 @@ class DataCollector:
         video_fps: Optional[int] = None,
         data_root: Optional[Path] = None,
         usd_path: Optional[str] = None,
+        use_random_povs: Optional[bool] = None,
         povs: Optional[list[PovConfig]] = None,
     ) -> None:
         """Initialize the collector, prioritizing explicit args over TOML config."""
         config = get_config()
-        paths = config.paths
+
+        self._resolve_run_params(config, num_samples, video_duration_sec, video_fps, usd_path)
+        self._build_output_dirs(config, data_root)
+        self._unpack_target(config.collect_target)
+        self._povs = self._resolve_povs(config, use_random_povs, povs)
+
+    # ------------------------------------------------------------------
+    # Initialization helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_run_params(
+        self,
+        config,
+        num_samples: Optional[int],
+        video_duration_sec: Optional[int],
+        video_fps: Optional[int],
+        usd_path: Optional[str],
+    ) -> None:
+        """Resolve scalar run parameters, preferring explicit args over TOML."""
         collect = config.collect
-        target = config.collect_target
 
         self._num_samples: int = num_samples if num_samples is not None else collect["num_samples"]
         self._video_duration_sec: int = video_duration_sec if video_duration_sec is not None else collect["video_duration_sec"]
         self._video_fps: int = video_fps if video_fps is not None else collect["video_fps"]
-        self._usd_path: str = usd_path if usd_path is not None else paths["usd_path"]
+        self._usd_path: str = usd_path if usd_path is not None else config.paths["usd_path"]
 
         self._initial_scene_load_time_sec: int = collect["initial_scene_load_time_sec"]
         self._camera_settle_time_sec: int = collect["camera_settle_time_sec"]
 
-        root = Path(data_root) if data_root is not None else Path(paths["data_root"])
+    def _build_output_dirs(self, config, data_root: Optional[Path]) -> None:
+        """Derive the video/pose/bbox output directories from the data root."""
+        root = Path(data_root) if data_root is not None else Path(config.paths["data_root"])
         self._video_dir: Path = root / "videos"
         self._pose_dir: Path = root / "poses"
         self._bbox_dir: Path = root / "bboxes"
 
+    def _unpack_target(self, target: dict) -> None:
+        """Unpack the target location and default orientation."""
         self._target_lat: float = target["lat"]
         self._target_lon: float = target["lon"]
         self._target_alt: float = target["alt"]
@@ -78,19 +100,57 @@ class DataCollector:
         self._default_pitch: float = target["pitch"]
         self._default_yaw: float = target["yaw"]
 
+    def _resolve_povs(
+        self,
+        config,
+        use_random_povs: Optional[bool],
+        povs: Optional[list[PovConfig]],
+    ) -> list[PovConfig]:
+        """Select the POV list: explicit arg, else random or configured per flag/TOML."""
         if povs is not None:
-            self._povs = povs
-        else:
-            self._povs = [
-                PovConfig(
-                    id=pov["id"],
-                    forward_m=-pov.get("backward_m", 0.0),
-                    right_m=pov.get("right_m", 0.0),
-                    up_m=pov.get("up_m", 0.0),
-                    zoom=pov.get("zoom", 0.0),
-                )
-                for pov in config.collect_povs
-            ]
+            return povs
+
+        random_cfg = config.collect_random
+        use_random = (
+            use_random_povs
+            if use_random_povs is not None
+            else random_cfg.get("enabled", False)
+        )
+        if use_random:
+            return self._generate_random_povs(random_cfg)
+        return self._load_configured_povs(config.collect_povs)
+
+    @staticmethod
+    def _load_configured_povs(pov_entries: list[dict]) -> list[PovConfig]:
+        """Build a list of POVs from the [[collect.povs]] config entries.
+
+        backward_m is negated into forward_m to match the convention used
+        elsewhere (forward_m < 0 places the camera behind the target).
+        """
+        return [
+            PovConfig(
+                id=pov["id"],
+                forward_m=-pov.get("backward_m", 0.0),
+                right_m=pov.get("right_m", 0.0),
+                up_m=pov.get("up_m", 0.0),
+                zoom=pov.get("zoom", 0.0),
+            )
+            for pov in pov_entries
+        ]
+
+    @staticmethod
+    def _generate_random_povs(random_cfg: dict) -> list[PovConfig]:
+        """Build a list of random POVs from the [collect.random] config."""
+        # Imported lazily to avoid a circular import (random_povs imports PovConfig).
+        from random_povs import RandomPovGenerator
+
+        generator = RandomPovGenerator(
+            x_range=tuple(random_cfg["backward_m_range"]),
+            y_range=tuple(random_cfg["right_m_range"]),
+            z_range=tuple(random_cfg["up_m_range"]),
+            zoom_range=tuple(random_cfg.get("zoom_range", (0.0, 0.0))),
+        )
+        return generator.generate(random_cfg["num_povs"])
 
     # ------------------------------------------------------------------
     # Public API

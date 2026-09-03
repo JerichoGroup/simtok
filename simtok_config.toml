@@ -22,6 +22,14 @@ video_fps = 20
 initial_scene_load_time_sec = 5
 camera_settle_time_sec = 2
 
+[collect.random]
+enabled = false                 # generate random POVs instead of [[collect.povs]]
+num_povs = 3                    # how many random POVs to generate
+backward_m_range = [10.0, 400.0]    # distance behind the target (positive)
+right_m_range = [-50.0, 50.0]       # lateral offset (negative = left)
+up_m_range = [0.0, 100.0]           # height above the target
+zoom_range = [0.0, 1.0]             # zoom value (0.0 wide .. 1.0 tele)
+
 [collect.target]
 lat = 32.12345
 lon = 35.12345
