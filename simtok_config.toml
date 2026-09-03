@@ -31,8 +31,8 @@ up_m_range = [0.0, 100.0]           # height above the target
 zoom_range = [0.0, 1.0]             # zoom value (0.0 wide .. 1.0 tele)
 
 [collect.target]
-lat = 32.12345
-lon = 35.12345
+lat = 32.22481
+lon = 35.25621
 alt = 0.0
 roll = 0.0
 pitch = 0.0
@@ -140,7 +140,7 @@ height_mm = 3.13
 
 [zoom.hfov]
 wide_deg = 65.0                 # at zoom = 0.0
-tele_deg = 7.2                  # at zoom = 1.0
+tele_deg = 3.2                  # at zoom = 1.0
 
 [zoom.slew]
 duration_sec = 4.0

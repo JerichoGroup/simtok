@@ -42,6 +42,14 @@ num_samples = 2
 video_fps = 20
 camera_settle_time_sec = 2.5
 
+[collect.random]
+enabled = false
+num_povs = 5
+backward_m_range = [10.0, 400.0]
+right_m_range = [-50.0, 50.0]
+up_m_range = [0.0, 100.0]
+zoom_range = [0.0, 1.0]
+
 [collect.target]
 lat = 32.12345
 lon = 35.12345
@@ -129,7 +137,7 @@ def test_paths_section(cfg):
 # ----------------------------------------------------------------------
 
 def test_collect_scalars_exclude_subtables(cfg):
-    """collect returns only scalar keys; target and povs are stripped out."""
+    """collect returns only scalar keys; target, povs and random are stripped out."""
     assert cfg.collect == {
         "num_samples": 2,
         "video_fps": 20,
@@ -137,10 +145,22 @@ def test_collect_scalars_exclude_subtables(cfg):
     }
     assert "target" not in cfg.collect
     assert "povs" not in cfg.collect
+    assert "random" not in cfg.collect
 
 
 def test_collect_target_section(cfg):
     assert cfg.collect_target == {"lat": 32.12345, "lon": 35.12345, "alt": 0.0}
+
+
+def test_collect_random_section(cfg):
+    assert cfg.collect_random == {
+        "enabled": False,
+        "num_povs": 5,
+        "backward_m_range": [10.0, 400.0],
+        "right_m_range": [-50.0, 50.0],
+        "up_m_range": [0.0, 100.0],
+        "zoom_range": [0.0, 1.0],
+    }
 
 
 def test_collect_povs_array_of_tables(cfg):
@@ -303,6 +323,7 @@ def test_shipped_config_parses_and_exposes_all_sections():
         real.paths,
         real.collect,
         real.collect_target,
+        real.collect_random,
         real.noise,
         real.noise_toggles,
         real.noise_image,

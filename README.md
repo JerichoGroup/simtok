@@ -8,6 +8,7 @@
 2. [System overview](#system-overview)
 3. [System requirements](#system-requirements)
 4. [How to use the system?](#how-to-use-the-system)
+5. [How to test the code?](#how-to-test-the-code)
 
 ---
 
@@ -144,5 +145,25 @@ The system runs from a single entrypoint; `simtok_cli.py` and can execute each s
 Each one of the possible scenarios has its own sub-arguments, such as:
 `duration`, `--num-samples`, `--data-root`...
 If none of the arguments are chosen, the system will use the default arguments in `simtok_config.toml`.
+
+---
+
+## How to test the code?
+
+The test suite lives in the `tests/` directory and is run with `pytest`. You **must** scope the run to `tests/` so that only the project's own tests are collected (the vendored `docker/` extensions ship their own tests that are not part of SimTok and will fail to import):
+
+```bash
+pytest tests/
+```
+
+Useful variations:
+
+* `pytest tests/ -v` — verbose, one line per test.
+* `pytest tests/test_collect.py` — run a single test module.
+* `pytest tests/ -k random` — run only tests whose name matches `random`.
+
+> **Note:** Do not run bare `pytest` from the project root — it will try to collect the vendored Cesium/Omniverse tests under `docker/` and error out. Always target `tests/`.
+
+The suite covers the configuration layer (`test_config.py`), the UDP bot math (`test_udp_bot.py`), the noise models (`test_noise_models.py`), the JSON metadata conversion (`test_json_creation.py`), the random POV generator (`test_random_povs.py`), and the data collector's initialization/resolution logic (`test_collect.py`).
 
 
