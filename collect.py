@@ -84,7 +84,7 @@ class DataCollector:
             self._povs = [
                 PovConfig(
                     id=pov["id"],
-                    forward_m=pov.get("forward_m", 0.0),
+                    forward_m=-pov.get("backward_m", 0.0),
                     right_m=pov.get("right_m", 0.0),
                     up_m=pov.get("up_m", 0.0),
                     zoom=pov.get("zoom", 0.0),

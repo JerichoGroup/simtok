@@ -32,28 +32,28 @@ yaw = 90.0
 
 [[collect.povs]]
 id = 1
-forward_m = -10.0
+backward_m = 10.0
 right_m = 0.0
 up_m = 0.0
 zoom = 0.0
 
 [[collect.povs]]
 id = 2
-forward_m = -10.0
+backward_m = 10.0
 right_m = 5.0
 up_m = 0.0
 zoom = 0.0
 
 [[collect.povs]]
 id = 3
-forward_m = -10.0
+backward_m = 10.0
 right_m = 5.0
 up_m = 0.0
 zoom = 0.25
 
 [[collect.povs]]
 id = 4
-forward_m = -400.0
+backward_m = 400.0
 right_m = 5.0
 up_m = 6.0
 zoom = 1.0
