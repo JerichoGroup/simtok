@@ -8,6 +8,7 @@ package "CLI" {
 
 package "Data Collection" {
     [collect.py]
+    [random_povs.py]
     [zoom_manager.py]
 }
 
@@ -29,6 +30,11 @@ package "Post-Processing" {
     [json_creation.py]
 }
 
+package "Config" {
+    [config.py]
+    [simtok_config.toml]
+}
+
 database "data/" {
     [videos/]
     [poses/]
@@ -43,6 +49,7 @@ database "data/" {
 [simtok_cli.py] --> [json_creation.py]
 
 [collect.py] --> [zoom_manager.py]
+[collect.py] --> [random_povs.py]
 [collect.py] --> [VideoCapture]
 [collect.py] --> [PoseCapture]
 [collect.py] --> [BboxCapture]
@@ -66,5 +73,15 @@ database "data/" {
 [json_creation.py] ..> [poses/] : reads
 [json_creation.py] ..> [bboxes/] : reads
 [json_creation.py] ..> [jsons/] : writes
+
+' === Shared configuration ===
+[config.py] ..> [simtok_config.toml] : loads
+[collect.py] ..> [config.py] : reads
+[random_povs.py] ..> [config.py] : reads
+[zoom_manager.py] ..> [config.py] : reads
+[noise_processor.py] ..> [config.py] : reads
+[json_creation.py] ..> [config.py] : reads
+[gray_scale.py] ..> [config.py] : reads
+[zoom_node.py] ..> [config.py] : reads
 
 @enduml

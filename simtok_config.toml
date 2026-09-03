@@ -27,7 +27,7 @@ enabled = false                 # generate random POVs instead of [[collect.povs
 num_povs = 3                    # how many random POVs to generate
 backward_m_range = [10.0, 400.0]    # distance behind the target (positive)
 right_m_range = [-50.0, 50.0]       # lateral offset (negative = left)
-up_m_range = [0.0, 100.0]           # height above the target
+up_m_range = [-50.0, 50.0]           # height above the target
 zoom_range = [0.0, 1.0]             # zoom value (0.0 wide .. 1.0 tele)
 
 [collect.target]
@@ -49,14 +49,14 @@ zoom = 0.0
 id = 2
 backward_m = 10.0
 right_m = 50.0
-up_m = 5.0
+up_m = 15.0
 zoom = 0.0
 
 [[collect.povs]]
 id = 3
 backward_m = 10.0
 right_m = 5.0
-up_m = 0.0
+up_m = 100.0
 zoom = 0.25
 
 [[collect.povs]]
