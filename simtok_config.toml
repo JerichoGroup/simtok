@@ -31,8 +31,8 @@ up_m_range = [0.0, 100.0]           # height above the target
 zoom_range = [0.0, 1.0]             # zoom value (0.0 wide .. 1.0 tele)
 
 [collect.target]
-lat = 32.22481
-lon = 35.25621
+lat = 32.12345
+lon = 35.12345
 alt = 0.0
 roll = 0.0
 pitch = 0.0
@@ -48,8 +48,8 @@ zoom = 0.0
 [[collect.povs]]
 id = 2
 backward_m = 10.0
-right_m = 5.0
-up_m = 0.0
+right_m = 50.0
+up_m = 5.0
 zoom = 0.0
 
 [[collect.povs]]
