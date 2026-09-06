@@ -24,7 +24,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 import config as config_module
 from config import SimtokConfig
 import collect as collect_module
-from collect import DataCollector, PovConfig
+from collect import DataCollector, PovConfig, SAMPLE_PATTERN
 
 
 # A complete fixture TOML covering every key __init__ reads.
@@ -74,6 +74,12 @@ zoom = 0.0
 # A variant with random collection enabled in TOML.
 FIXTURE_TOML_RANDOM_ENABLED = FIXTURE_TOML.replace("enabled = false", "enabled = true")
 
+# A random-enabled variant with zoom_range omitted, to exercise the
+# random_cfg.get("zoom_range", (0.0, 0.0)) fallback in _generate_random_povs.
+FIXTURE_TOML_RANDOM_NO_ZOOM = FIXTURE_TOML_RANDOM_ENABLED.replace(
+    "zoom_range = [0.0, 1.0]\n", ""
+)
+
 
 def _install_config(monkeypatch, tmp_path, toml_text: str) -> None:
     """Point the config singleton at a SimtokConfig built from toml_text."""
@@ -90,6 +96,11 @@ def cfg_default(monkeypatch, tmp_path):
 @pytest.fixture
 def cfg_random_enabled(monkeypatch, tmp_path):
     _install_config(monkeypatch, tmp_path, FIXTURE_TOML_RANDOM_ENABLED)
+
+
+@pytest.fixture
+def cfg_random_no_zoom(monkeypatch, tmp_path):
+    _install_config(monkeypatch, tmp_path, FIXTURE_TOML_RANDOM_NO_ZOOM)
 
 
 # ----------------------------------------------------------------------
@@ -181,3 +192,103 @@ def test_arg_false_overrides_toml_enabled(cfg_random_enabled):
 def test_arg_none_defers_to_toml(cfg_random_enabled):
     d = DataCollector(use_random_povs=None)
     assert len(d._povs) == 6
+
+
+# ----------------------------------------------------------------------
+# Random config plumbing: fallbacks, range propagation, edge cases
+# ----------------------------------------------------------------------
+
+def test_empty_explicit_povs_list_is_respected(cfg_random_enabled):
+    """povs=[] is not None, so it short-circuits random/configured selection."""
+    d = DataCollector(povs=[])
+    assert d._povs == []
+
+
+def test_random_zoom_range_omitted_falls_back_to_zero(cfg_random_no_zoom):
+    """When [collect.random] omits zoom_range, all generated zooms are 0.0."""
+    d = DataCollector()
+    assert len(d._povs) == 6
+    assert all(p.zoom == 0.0 for p in d._povs)
+
+
+def test_random_ranges_propagate_from_toml(cfg_random_enabled):
+    """Generated POVs respect the TOML ranges, not just the requested count.
+
+    Confirms collect wires backward/right/up/zoom ranges through to the
+    generator (backward_m is negated into forward_m).
+    """
+    import random
+
+    random.seed(2024)
+    d = DataCollector()
+    for p in d._povs:
+        assert -400.0 <= p.forward_m <= -10.0  # backward_m_range [10, 400] negated
+        assert -50.0 <= p.right_m <= 50.0       # right_m_range
+        assert 0.0 <= p.up_m <= 100.0           # up_m_range
+        assert 0.0 <= p.zoom <= 1.0             # zoom_range
+
+
+def test_random_missing_num_povs_raises_key_error(monkeypatch, tmp_path):
+    """enabled=true but num_povs absent -> KeyError from _generate_random_povs."""
+    toml_text = FIXTURE_TOML_RANDOM_ENABLED.replace("num_povs = 6\n", "")
+    _install_config(monkeypatch, tmp_path, toml_text)
+    with pytest.raises(KeyError):
+        DataCollector()
+
+
+def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
+    """enabled=true but a required *_range key absent -> KeyError."""
+    toml_text = FIXTURE_TOML_RANDOM_ENABLED.replace(
+        "backward_m_range = [10.0, 400.0]\n", ""
+    )
+    _install_config(monkeypatch, tmp_path, toml_text)
+    with pytest.raises(KeyError):
+        DataCollector()
+
+
+# ----------------------------------------------------------------------
+# Filename / sample-id logic
+# ----------------------------------------------------------------------
+
+def test_build_filename_prefix_zero_pads_sample(cfg_default):
+    d = DataCollector()
+    prefix = d._build_filename_prefix(3, PovConfig(id=2))
+    assert prefix == "sample_003_pov_2"
+
+
+def test_build_filename_prefix_large_sample(cfg_default):
+    d = DataCollector()
+    prefix = d._build_filename_prefix(123, PovConfig(id=10))
+    assert prefix == "sample_123_pov_10"
+
+
+def test_next_sample_id_empty_dir_is_zero(cfg_default, tmp_path):
+    d = DataCollector(data_root=tmp_path)
+    d._video_dir.mkdir(parents=True, exist_ok=True)
+    assert d._get_next_sample_id() == 0
+
+
+def test_next_sample_id_is_max_plus_one(cfg_default, tmp_path):
+    d = DataCollector(data_root=tmp_path)
+    d._video_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("sample_000_pov_1.mp4", "sample_003_pov_1.mp4", "sample_003_pov_2.mp4"):
+        (d._video_dir / name).touch()
+    assert d._get_next_sample_id() == 4
+
+
+def test_next_sample_id_ignores_non_matching_files(cfg_default, tmp_path):
+    d = DataCollector(data_root=tmp_path)
+    d._video_dir.mkdir(parents=True, exist_ok=True)
+    (d._video_dir / "sample_005_pov_1.mp4").touch()
+    # Non-matching names must be ignored by SAMPLE_PATTERN.
+    for name in ("notes.txt", "sample_x_pov_1.mp4", "sample_5_pov_1.mp4", "sample_005_pov_1.pkl"):
+        (d._video_dir / name).touch()
+    assert d._get_next_sample_id() == 6
+
+
+def test_sample_pattern_matching():
+    """SAMPLE_PATTERN matches the canonical name and rejects malformed ones."""
+    assert SAMPLE_PATTERN.match("sample_007_pov_3.mp4").group(1) == "007"
+    assert SAMPLE_PATTERN.match("sample_7_pov_3.mp4") is None   # sample not 3 digits
+    assert SAMPLE_PATTERN.match("sample_007_pov_.mp4") is None  # missing pov id
+    assert SAMPLE_PATTERN.match("sample_007_pov_3.pkl") is None  # wrong extension

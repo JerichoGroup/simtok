@@ -97,3 +97,38 @@ def test_different_seeds_produce_different_povs(generator):
     random.seed(2)
     b = generator.generate(5)
     assert a != b
+
+
+# ----------------------------------------------------------------------
+# Edge and degenerate inputs
+# ----------------------------------------------------------------------
+
+def test_generate_negative_count_returns_empty(generator):
+    """A negative count yields range(1, <=0) -> no POVs (documents behavior)."""
+    assert generator.generate(-1) == []
+    assert generator.generate(-100) == []
+
+
+def test_inverted_range_still_stays_within_bounds():
+    """random.uniform(a, b) with a > b returns a value in [b, a].
+
+    The generator does not sort its ranges, so an inverted backward range must
+    still produce forward_m within the negated bounds. This pins the contract.
+    """
+    gen = RandomPovGenerator((400.0, 10.0), (50.0, -50.0), (100.0, 0.0), (1.0, 0.0))
+    for p in gen.generate(200):
+        # forward_m = -uniform(400, 10) -> in [-400, -10]
+        assert -400.0 <= p.forward_m <= -10.0
+        assert -50.0 <= p.right_m <= 50.0
+        assert 0.0 <= p.up_m <= 100.0
+        assert 0.0 <= p.zoom <= 1.0
+
+
+def test_all_fields_pinned_to_distinct_constants():
+    """Degenerate (a, a) ranges pin every field, verifying each mapping at once."""
+    gen = RandomPovGenerator((30.0, 30.0), (7.0, 7.0), (12.0, 12.0), (0.4, 0.4))
+    p = gen.generate(1)[0]
+    assert p.forward_m == pytest.approx(-30.0)  # backward negated into forward
+    assert p.right_m == pytest.approx(7.0)
+    assert p.up_m == pytest.approx(12.0)
+    assert p.zoom == pytest.approx(0.4)
