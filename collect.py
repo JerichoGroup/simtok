@@ -260,7 +260,7 @@ class DataCollector:
         if pov.up_m:
             camera.move_up_down(pov.up_m, duration_s=0)
 
-        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
+        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt, 0)
 
         zoom_commander.set_zoom(pov.zoom)
 

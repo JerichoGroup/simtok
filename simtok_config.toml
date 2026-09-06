@@ -41,30 +41,26 @@ yaw = 90.0
 [[collect.povs]]
 id = 1
 backward_m = 10.0
-right_m = 0.0
+right_m = 25.0
 up_m = 0.0
 zoom = 0.0
 
 [[collect.povs]]
 id = 2
 backward_m = 10.0
-right_m = 50.0
-up_m = 15.0
+right_m = 0.0
+up_m = 25.0
 zoom = 0.0
 
 [[collect.povs]]
 id = 3
 backward_m = 10.0
-right_m = 5.0
-up_m = 100.0
-zoom = 0.25
+right_m = 25.0
+up_m = 25.0
+zoom = 0.0
 
-[[collect.povs]]
-id = 4
-backward_m = 400.0
-right_m = 5.0
-up_m = 6.0
-zoom = 1.0
+
+
 
 # =============================================================================
 # Noise Processor
