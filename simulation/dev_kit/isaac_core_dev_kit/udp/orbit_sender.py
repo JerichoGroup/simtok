@@ -5,7 +5,7 @@ import math
 from typing import Optional, Tuple
 
 from .base_udp_sender import BaseUDPSender
-from .udp_utils import meters_to_latlon
+from .udp_utils import meters_to_latlon_offset
 
 
 # ==================== the OrbitSender class ====================
@@ -51,7 +51,7 @@ class OrbitSender(BaseUDPSender):
         x = self.radius_m * math.cos(t)
         y = self.radius_m * math.sin(t)
 
-        d_lat, d_lon = meters_to_latlon(x, y, self.center_lat)
+        d_lat, d_lon = meters_to_latlon_offset(x, y, self.center_lat)
         lat = self.center_lat + d_lat
         lon = self.center_lon + d_lon
         alt = self.height_m

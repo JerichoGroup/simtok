@@ -7,7 +7,7 @@ name = "isaac_core_dev_kit"
 version = "1.0.0"
 description = "A development kit for running Isaac Sim, capturing data, and sending UDP commands, using the isaac_core_2023 repo."
 authors = [
-    { name="Mr_Blum", email="gg@gg.gg" }
+    { name="Maple Office", email="mapleoffice@atomicmail.io" }
 ]
 readme = "README.md"
 requires-python = ">=3.8"

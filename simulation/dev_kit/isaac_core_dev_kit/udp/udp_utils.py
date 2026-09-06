@@ -19,7 +19,7 @@ class LLAPoint:
 
 
 # ==================== Helper - lla to distance m ====================
-def lla_distance_to_m(p1: LLAPoint, p2: LLAPoint) -> float:
+def lla_distance_to_meters(p1: LLAPoint, p2: LLAPoint) -> float:
     """Compute distance in meters between two LLA points."""
 
 
@@ -33,10 +33,10 @@ def lla_distance_to_m(p1: LLAPoint, p2: LLAPoint) -> float:
 
 
 # ==================== Helper - meters ====================
-def meters_to_latlon(dx: float, dy: float, ref_lat_lon: float) -> Tuple[float, float]:
+def meters_to_latlon_offset(dx: float, dy: float, ref_lat: float) -> Tuple[float, float]:
     """Convert x/y offset in meters to lat/lon offset in degrees."""
 
     d_lat = dx / R
-    d_lon = dy / (R * math.cos(math.radians(ref_lat_lon)))
+    d_lon = dy / (R * math.cos(math.radians(ref_lat)))
 
     return math.degrees(d_lat), math.degrees(d_lon)

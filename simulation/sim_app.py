@@ -19,6 +19,12 @@ kit = SimulationApp(launch_config=LAUNCH_CONFIG)
 # ==== Make isaacsim imports available for the imported modules ==== #
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
+# ==== Make the project root importable for script nodes ==== #
+# Isaac executes script nodes from a temp file, so their own __file__ cannot
+# locate the project. Script nodes share this interpreter and run after this
+# module, so adding the project root here makes `import config` resolve in them.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 # ================= Additional isaacsim imports ==================== #
 import omni.usd

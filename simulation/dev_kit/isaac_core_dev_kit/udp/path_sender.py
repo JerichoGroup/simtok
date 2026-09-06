@@ -5,7 +5,7 @@ import math
 from typing import List, Optional, Tuple
 
 from .base_udp_sender import BaseUDPSender
-from .udp_utils import LLAPoint, lla_distance_to_m
+from .udp_utils import LLAPoint, lla_distance_to_meters
 
 
 # ==================== the PathSender class ====================
@@ -34,7 +34,7 @@ class PathSender(BaseUDPSender):
 
         self._distances = [0.0]
         for i in range(1, len(self.points)):
-            d = lla_distance_to_m(points[i - 1], points[i])
+            d = lla_distance_to_meters(points[i - 1], points[i])
             self._distances.append(self._distances[-1] + d)
 
         self._total_distance = self._distances[-1]
