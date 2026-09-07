@@ -59,7 +59,7 @@ class DataCollector:
         self._resolve_run_params(config, num_samples, video_duration_sec, video_fps, usd_path)
         self._build_output_dirs(config, data_root)
         self._unpack_target(config.collect_target)
-        self._povs = self._resolve_povs(config, use_random_povs, povs)
+        self._resolve_povs(config, use_random_povs, povs)
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -105,20 +105,50 @@ class DataCollector:
         config,
         use_random_povs: Optional[bool],
         povs: Optional[list[PovConfig]],
-    ) -> list[PovConfig]:
-        """Select the POV list: explicit arg, else random or configured per flag/TOML."""
-        if povs is not None:
-            return povs
+    ) -> None:
+        """Determine how POVs are produced for the run and store the mode.
 
+        Sets:
+          - self._use_random: whether POVs are regenerated randomly per sample.
+          - self._random_cfg: the [collect.random] config used for regeneration.
+          - self._povs: the fixed POV list for the explicit/configured paths
+            (unused when self._use_random is True, where POVs are drawn fresh
+            for each sample).
+
+        Precedence: an explicit ``povs`` argument wins, then the random flag
+        (arg over TOML ``enabled``), else the configured [[collect.povs]] list.
+        In random mode the configured POVs are ignored entirely.
+        """
         random_cfg = config.collect_random
+        self._random_cfg = random_cfg
+
+        if povs is not None:
+            self._use_random = False
+            self._povs = povs
+            return
+
         use_random = (
             use_random_povs
             if use_random_povs is not None
             else random_cfg.get("enabled", False)
         )
-        if use_random:
-            return self._generate_random_povs(random_cfg)
-        return self._load_configured_povs(config.collect_povs)
+        self._use_random = bool(use_random)
+
+        if self._use_random:
+            self._povs = []
+        else:
+            self._povs = self._load_configured_povs(config.collect_povs)
+
+    def _povs_for_sample(self) -> list[PovConfig]:
+        """Return the POVs to use for one sample.
+
+        In random mode a fresh list of random POVs is generated for every
+        sample (ids 1..num_povs). Otherwise the fixed configured/explicit
+        list is reused across all samples.
+        """
+        if self._use_random:
+            return self._generate_random_povs(self._random_cfg)
+        return self._povs
 
     @staticmethod
     def _load_configured_povs(pov_entries: list[dict]) -> list[PovConfig]:
@@ -322,7 +352,7 @@ class DataCollector:
 
             self._publish_oscillation(new_pub)
 
-            for pov in self._povs:
+            for pov in self._povs_for_sample():
                 self._capture_sample_from_pov(
                     sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
                 )

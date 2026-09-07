@@ -170,8 +170,10 @@ def test_explicit_povs_take_precedence(cfg_random_enabled):
 
 def test_toml_enabled_selects_random(cfg_random_enabled):
     d = DataCollector()
-    assert len(d._povs) == 6  # num_povs from fixture
-    assert [p.id for p in d._povs] == [1, 2, 3, 4, 5, 6]
+    assert d._use_random is True
+    povs = d._povs_for_sample()
+    assert len(povs) == 6  # num_povs from fixture
+    assert [p.id for p in povs] == [1, 2, 3, 4, 5, 6]
 
 
 def test_toml_disabled_selects_configured(cfg_default):
@@ -181,7 +183,8 @@ def test_toml_disabled_selects_configured(cfg_default):
 
 def test_arg_true_overrides_toml_disabled(cfg_default):
     d = DataCollector(use_random_povs=True)
-    assert len(d._povs) == 6
+    assert d._use_random is True
+    assert len(d._povs_for_sample()) == 6
 
 
 def test_arg_false_overrides_toml_enabled(cfg_random_enabled):
@@ -191,7 +194,25 @@ def test_arg_false_overrides_toml_enabled(cfg_random_enabled):
 
 def test_arg_none_defers_to_toml(cfg_random_enabled):
     d = DataCollector(use_random_povs=None)
-    assert len(d._povs) == 6
+    assert d._use_random is True
+    assert len(d._povs_for_sample()) == 6
+
+
+def test_random_povs_differ_between_samples(cfg_random_enabled):
+    """In random mode each sample draws a fresh POV geometry (same ids)."""
+    import random
+
+    random.seed(2024)
+    d = DataCollector()
+
+    sample_a = d._povs_for_sample()
+    sample_b = d._povs_for_sample()
+
+    # Ids are stable slots 1..num_povs across samples...
+    assert [p.id for p in sample_a] == [1, 2, 3, 4, 5, 6]
+    assert [p.id for p in sample_b] == [1, 2, 3, 4, 5, 6]
+    # ...but the geometry differs between samples.
+    assert sample_a != sample_b
 
 
 # ----------------------------------------------------------------------
@@ -207,8 +228,9 @@ def test_empty_explicit_povs_list_is_respected(cfg_random_enabled):
 def test_random_zoom_range_omitted_falls_back_to_zero(cfg_random_no_zoom):
     """When [collect.random] omits zoom_range, all generated zooms are 0.0."""
     d = DataCollector()
-    assert len(d._povs) == 6
-    assert all(p.zoom == 0.0 for p in d._povs)
+    povs = d._povs_for_sample()
+    assert len(povs) == 6
+    assert all(p.zoom == 0.0 for p in povs)
 
 
 def test_random_ranges_propagate_from_toml(cfg_random_enabled):
@@ -221,7 +243,7 @@ def test_random_ranges_propagate_from_toml(cfg_random_enabled):
 
     random.seed(2024)
     d = DataCollector()
-    for p in d._povs:
+    for p in d._povs_for_sample():
         assert -400.0 <= p.forward_m <= -10.0  # backward_m_range [10, 400] negated
         assert -50.0 <= p.right_m <= 50.0       # right_m_range
         assert 0.0 <= p.up_m <= 100.0           # up_m_range
@@ -229,11 +251,12 @@ def test_random_ranges_propagate_from_toml(cfg_random_enabled):
 
 
 def test_random_missing_num_povs_raises_key_error(monkeypatch, tmp_path):
-    """enabled=true but num_povs absent -> KeyError from _generate_random_povs."""
+    """enabled=true but num_povs absent -> KeyError when POVs are drawn."""
     toml_text = FIXTURE_TOML_RANDOM_ENABLED.replace("num_povs = 6\n", "")
     _install_config(monkeypatch, tmp_path, toml_text)
+    d = DataCollector()
     with pytest.raises(KeyError):
-        DataCollector()
+        d._povs_for_sample()
 
 
 def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
@@ -242,8 +265,9 @@ def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
         "backward_m_range = [10.0, 400.0]\n", ""
     )
     _install_config(monkeypatch, tmp_path, toml_text)
+    d = DataCollector()
     with pytest.raises(KeyError):
-        DataCollector()
+        d._povs_for_sample()
 
 
 # ----------------------------------------------------------------------
