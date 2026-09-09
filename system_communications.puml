@@ -2,6 +2,36 @@
 
 title SimTok — System Communications
 
+' === Global styling ===
+skinparam backgroundColor #FDFDFD
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 55
+
+skinparam package {
+    BorderColor #6B7B8C
+    BackgroundColor #F4F7FA
+    FontColor #2C3E50
+    FontStyle bold
+}
+
+skinparam component {
+    BorderColor #4A90D9
+    BackgroundColor #EAF3FB
+    FontColor #1F3A54
+}
+
+skinparam database {
+    BorderColor #7AA05A
+    BackgroundColor #EEF5E6
+}
+
+skinparam ArrowColor #5B6B7B
+skinparam ArrowFontColor #55606B
+skinparam ArrowThickness 1
+
 package "CLI" {
     [simtok_cli.py]
 }
@@ -44,44 +74,44 @@ database "data/" {
 }
 
 ' === API calls ===
-[simtok_cli.py] --> [collect.py]
-[simtok_cli.py] --> [noise_processor.py]
-[simtok_cli.py] --> [json_creation.py]
+[simtok_cli.py] -[#4A90D9]-> [collect.py]
+[simtok_cli.py] -[#4A90D9]-> [noise_processor.py]
+[simtok_cli.py] -[#4A90D9]-> [json_creation.py]
 
-[collect.py] --> [zoom_manager.py]
-[collect.py] --> [random_povs.py]
-[collect.py] --> [VideoCapture]
-[collect.py] --> [PoseCapture]
-[collect.py] --> [BboxCapture]
+[collect.py] -[#4A90D9]-> [zoom_manager.py]
+[collect.py] -[#4A90D9]-> [random_povs.py]
+[collect.py] -[#4A90D9]-> [VideoCapture]
+[collect.py] -[#4A90D9]-> [PoseCapture]
+[collect.py] -[#4A90D9]-> [BboxCapture]
 
 ' === ROS2 topics ===
-[collect.py] -[bold]-> [gray_scale.py] : /simtok/reset_oscillation\n/simtok/new_oscillation
-[zoom_manager.py] -[bold]-> [zoom_node.py] : /simtok/zoom
-[bbox_publisher] -[bold]-> [gray_scale.py] : /isaac_core/bbox
+[collect.py] -[#C0392B,bold]-> [gray_scale.py] : /simtok/reset_oscillation\n/simtok/new_oscillation
+[zoom_manager.py] -[#C0392B,bold]-> [zoom_node.py] : /simtok/zoom
+[bbox_publisher] -[#C0392B,bold]-> [gray_scale.py] : /isaac_core/bbox
 
 ' === UDP ===
-[collect.py] -[dashed]-> [udp_camera] : UDP
+[collect.py] -[#E67E22,dashed]-> [udp_camera] : UDP
 
 ' === File I/O ===
-[VideoCapture] ..> [videos/]
-[PoseCapture] ..> [poses/]
-[BboxCapture] ..> [bboxes/]
+[VideoCapture] .[#7AA05A].> [videos/]
+[PoseCapture] .[#7AA05A].> [poses/]
+[BboxCapture] .[#7AA05A].> [bboxes/]
 
-[noise_processor.py] ..> [videos/] : reads
-[noise_processor.py] ..> [noise_videos/] : writes
+[noise_processor.py] .[#7AA05A].> [videos/] : reads
+[noise_processor.py] .[#7AA05A].> [noise_videos/] : writes
 
-[json_creation.py] ..> [poses/] : reads
-[json_creation.py] ..> [bboxes/] : reads
-[json_creation.py] ..> [jsons/] : writes
+[json_creation.py] .[#7AA05A].> [poses/] : reads
+[json_creation.py] .[#7AA05A].> [bboxes/] : reads
+[json_creation.py] .[#7AA05A].> [jsons/] : writes
 
 ' === Shared configuration ===
-[config.py] ..> [simtok_config.toml] : loads
-[collect.py] ..> [config.py] : reads
-[random_povs.py] ..> [config.py] : reads
-[zoom_manager.py] ..> [config.py] : reads
-[noise_processor.py] ..> [config.py] : reads
-[json_creation.py] ..> [config.py] : reads
-[gray_scale.py] ..> [config.py] : reads
-[zoom_node.py] ..> [config.py] : reads
+[config.py] .[#95A5A6].> [simtok_config.toml] : loads
+[collect.py] .[#95A5A6].> [config.py] : reads
+[random_povs.py] .[#95A5A6].> [config.py] : reads
+[zoom_manager.py] .[#95A5A6].> [config.py] : reads
+[noise_processor.py] .[#95A5A6].> [config.py] : reads
+[json_creation.py] .[#95A5A6].> [config.py] : reads
+[gray_scale.py] .[#95A5A6].> [config.py] : reads
+[zoom_node.py] .[#95A5A6].> [config.py] : reads
 
 @enduml
