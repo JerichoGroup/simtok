@@ -171,7 +171,7 @@ def test_explicit_povs_take_precedence(cfg_random_enabled):
 def test_toml_enabled_selects_random(cfg_random_enabled):
     d = DataCollector()
     assert d._use_random is True
-    povs = d._povs_for_sample()
+    povs = d._get_sample_povs()
     assert len(povs) == 6  # num_povs from fixture
     assert [p.id for p in povs] == [1, 2, 3, 4, 5, 6]
 
@@ -184,7 +184,7 @@ def test_toml_disabled_selects_configured(cfg_default):
 def test_arg_true_overrides_toml_disabled(cfg_default):
     d = DataCollector(use_random_povs=True)
     assert d._use_random is True
-    assert len(d._povs_for_sample()) == 6
+    assert len(d._get_sample_povs()) == 6
 
 
 def test_arg_false_overrides_toml_enabled(cfg_random_enabled):
@@ -195,7 +195,7 @@ def test_arg_false_overrides_toml_enabled(cfg_random_enabled):
 def test_arg_none_defers_to_toml(cfg_random_enabled):
     d = DataCollector(use_random_povs=None)
     assert d._use_random is True
-    assert len(d._povs_for_sample()) == 6
+    assert len(d._get_sample_povs()) == 6
 
 
 def test_random_povs_differ_between_samples(cfg_random_enabled):
@@ -205,8 +205,8 @@ def test_random_povs_differ_between_samples(cfg_random_enabled):
     random.seed(2024)
     d = DataCollector()
 
-    sample_a = d._povs_for_sample()
-    sample_b = d._povs_for_sample()
+    sample_a = d._get_sample_povs()
+    sample_b = d._get_sample_povs()
 
     # Ids are stable slots 1..num_povs across samples...
     assert [p.id for p in sample_a] == [1, 2, 3, 4, 5, 6]
@@ -228,7 +228,7 @@ def test_empty_explicit_povs_list_is_respected(cfg_random_enabled):
 def test_random_zoom_range_omitted_falls_back_to_zero(cfg_random_no_zoom):
     """When [collect.random] omits zoom_range, all generated zooms are 0.0."""
     d = DataCollector()
-    povs = d._povs_for_sample()
+    povs = d._get_sample_povs()
     assert len(povs) == 6
     assert all(p.zoom == 0.0 for p in povs)
 
@@ -243,7 +243,7 @@ def test_random_ranges_propagate_from_toml(cfg_random_enabled):
 
     random.seed(2024)
     d = DataCollector()
-    for p in d._povs_for_sample():
+    for p in d._get_sample_povs():
         assert -400.0 <= p.depth_m <= -10.0     # depth_range_m [10, 400] negated
         assert -50.0 <= p.horizontal_m <= 50.0  # horizontal_range_m
         assert 0.0 <= p.vertical_m <= 100.0     # vertical_range_m
@@ -256,7 +256,7 @@ def test_random_missing_num_povs_raises_key_error(monkeypatch, tmp_path):
     _install_config(monkeypatch, tmp_path, toml_text)
     d = DataCollector()
     with pytest.raises(KeyError):
-        d._povs_for_sample()
+        d._get_sample_povs()
 
 
 def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
@@ -267,7 +267,7 @@ def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
     _install_config(monkeypatch, tmp_path, toml_text)
     d = DataCollector()
     with pytest.raises(KeyError):
-        d._povs_for_sample()
+        d._get_sample_povs()
 
 
 # ----------------------------------------------------------------------

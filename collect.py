@@ -139,7 +139,7 @@ class DataCollector:
         else:
             self._povs = self._load_configured_povs(config.collect_povs)
 
-    def _povs_for_sample(self) -> list[PovConfig]:
+    def _get_sample_povs(self) -> list[PovConfig]:
         """Return the POVs to use for one sample.
 
         In random mode a fresh list of random POVs is generated for every
@@ -353,7 +353,7 @@ class DataCollector:
 
             self._publish_oscillation(new_pub)
 
-            for pov in self._povs_for_sample():
+            for pov in self._get_sample_povs():
                 self._capture_sample_from_pov(
                     sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
                 )
