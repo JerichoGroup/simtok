@@ -59,7 +59,7 @@ class DataCollector:
         self._resolve_run_params(config, num_samples, video_duration_sec, video_fps, usd_path)
         self._build_output_dirs(config, data_root)
         self._unpack_target(config.collect_target)
-        self._resolve_povs(config, use_random_povs, povs)
+        self._create_povs(config, use_random_povs, povs)
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -100,7 +100,7 @@ class DataCollector:
         self._default_pitch: float = target["pitch"]
         self._default_yaw: float = target["yaw"]
 
-    def _resolve_povs(
+    def _create_povs(
         self,
         config,
         use_random_povs: Optional[bool],
