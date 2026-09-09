@@ -33,9 +33,9 @@ class PovConfig:
     """Store a single camera point-of-view configuration."""
 
     id: int
-    forward_m: float = 0.0
-    right_m: float = 0.0
-    up_m: float = 0.0
+    depth_m: float = 0.0
+    horizontal_m: float = 0.0
+    vertical_m: float = 0.0
     zoom: float = 0.0
 
 
@@ -154,15 +154,16 @@ class DataCollector:
     def _load_configured_povs(pov_entries: list[dict]) -> list[PovConfig]:
         """Build a list of POVs from the [[collect.povs]] config entries.
 
-        backward_m is negated into forward_m to match the convention used
-        elsewhere (forward_m < 0 places the camera behind the target).
+        The config expresses depth as a positive "behind the target" distance;
+        it is negated into the internal depth_m so that depth_m < 0 places the
+        camera behind the target (the convention used elsewhere).
         """
         return [
             PovConfig(
                 id=pov["id"],
-                forward_m=-pov.get("backward_m", 0.0),
-                right_m=pov.get("right_m", 0.0),
-                up_m=pov.get("up_m", 0.0),
+                depth_m=-pov.get("depth_m", 0.0),
+                horizontal_m=pov.get("horizontal_m", 0.0),
+                vertical_m=pov.get("vertical_m", 0.0),
                 zoom=pov.get("zoom", 0.0),
             )
             for pov in pov_entries
@@ -175,9 +176,9 @@ class DataCollector:
         from random_povs import RandomPovGenerator
 
         generator = RandomPovGenerator(
-            x_range=tuple(random_cfg["backward_m_range"]),
-            y_range=tuple(random_cfg["right_m_range"]),
-            z_range=tuple(random_cfg["up_m_range"]),
+            x_range=tuple(random_cfg["depth_range_m"]),
+            y_range=tuple(random_cfg["horizontal_range_m"]),
+            z_range=tuple(random_cfg["vertical_range_m"]),
             zoom_range=tuple(random_cfg.get("zoom_range", (0.0, 0.0))),
         )
         return generator.generate(random_cfg["num_povs"])
@@ -283,12 +284,12 @@ class DataCollector:
             look_at_target=True, duration_s=0, turn_duration_s=0
         )
 
-        if pov.forward_m:
-            camera.move_forward_backward(pov.forward_m, duration_s=0)
-        if pov.right_m:
-            camera.move_right_left(pov.right_m, duration_s=0)
-        if pov.up_m:
-            camera.move_up_down(pov.up_m, duration_s=0)
+        if pov.depth_m:
+            camera.move_forward_backward(pov.depth_m, duration_s=0)
+        if pov.horizontal_m:
+            camera.move_right_left(pov.horizontal_m, duration_s=0)
+        if pov.vertical_m:
+            camera.move_up_down(pov.vertical_m, duration_s=0)
 
         camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt, 0)
 

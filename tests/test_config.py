@@ -45,9 +45,9 @@ camera_settle_time_sec = 2.5
 [collect.random]
 enabled = false
 num_povs = 5
-backward_m_range = [10.0, 400.0]
-right_m_range = [-50.0, 50.0]
-up_m_range = [0.0, 100.0]
+depth_range_m = [10.0, 400.0]
+horizontal_range_m = [-50.0, 50.0]
+vertical_range_m = [0.0, 100.0]
 zoom_range = [0.0, 1.0]
 
 [collect.target]
@@ -156,9 +156,9 @@ def test_collect_random_section(cfg):
     assert cfg.collect_random == {
         "enabled": False,
         "num_povs": 5,
-        "backward_m_range": [10.0, 400.0],
-        "right_m_range": [-50.0, 50.0],
-        "up_m_range": [0.0, 100.0],
+        "depth_range_m": [10.0, 400.0],
+        "horizontal_range_m": [-50.0, 50.0],
+        "vertical_range_m": [0.0, 100.0],
         "zoom_range": [0.0, 1.0],
     }
 

@@ -18,9 +18,9 @@ class RandomPovGenerator:
     ) -> None:
         """Initialize the generator.
 
-        x_range is backward distance (positive = behind target), y_range is the
-        right offset (negative = left), z_range is height, and zoom_range is the
-        zoom value (0.0 wide .. 1.0 tele).
+        x_range is depth distance (positive = behind target), y_range is the
+        horizontal offset (negative = left), z_range is height, and zoom_range is
+        the zoom value (0.0 wide .. 1.0 tele).
         """
         self._x_range: Tuple[float, float] = x_range
         self._y_range: Tuple[float, float] = y_range
@@ -30,14 +30,14 @@ class RandomPovGenerator:
     def _generate_random_pov(self, pov_id: int) -> PovConfig:
         """Generate a single random POV.
 
-        Backward distance is negated into forward_m to match the convention used
-        elsewhere (forward_m < 0 places the camera behind the target).
+        Depth distance is negated into depth_m to match the convention used
+        elsewhere (depth_m < 0 places the camera behind the target).
         """
         return PovConfig(
             id=pov_id,
-            forward_m=-uniform(*self._x_range),
-            right_m=uniform(*self._y_range),
-            up_m=uniform(*self._z_range),
+            depth_m=-uniform(*self._x_range),
+            horizontal_m=uniform(*self._y_range),
+            vertical_m=uniform(*self._z_range),
             zoom=uniform(*self._zoom_range),
         )
 

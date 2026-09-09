@@ -1,7 +1,7 @@
 """Unit tests for collect.DataCollector initialization/resolution logic.
 
 These cover only __init__ resolution (no Isaac/ROS run):
-    - backward_m is negated into forward_m for configured POVs
+    - depth_m is negated into the internal depth_m for configured POVs
     - explicit povs= arg takes precedence over everything
     - use_random_povs arg overrides the TOML [collect.random].enabled flag
     - TOML enabled is used when the arg is None
@@ -43,9 +43,9 @@ camera_settle_time_sec = 2
 [collect.random]
 enabled = false
 num_povs = 6
-backward_m_range = [10.0, 400.0]
-right_m_range = [-50.0, 50.0]
-up_m_range = [0.0, 100.0]
+depth_range_m = [10.0, 400.0]
+horizontal_range_m = [-50.0, 50.0]
+vertical_range_m = [0.0, 100.0]
 zoom_range = [0.0, 1.0]
 
 [collect.target]
@@ -58,16 +58,16 @@ yaw = 90.0
 
 [[collect.povs]]
 id = 1
-backward_m = 10.0
-right_m = 5.0
-up_m = 0.0
+depth_m = 10.0
+horizontal_m = 5.0
+vertical_m = 0.0
 zoom = 0.5
 
 [[collect.povs]]
 id = 2
-backward_m = 20.0
-right_m = -5.0
-up_m = 3.0
+depth_m = 20.0
+horizontal_m = -5.0
+vertical_m = 3.0
 zoom = 0.0
 """
 
@@ -146,14 +146,14 @@ def test_target_unpacked(cfg_default):
 
 
 # ----------------------------------------------------------------------
-# Configured POVs: backward_m negation
+# Configured POVs: depth_m negation
 # ----------------------------------------------------------------------
 
-def test_configured_povs_negate_backward_into_forward(cfg_default):
+def test_configured_povs_negate_depth_into_depth_m(cfg_default):
     d = DataCollector()
     assert d._povs == [
-        PovConfig(id=1, forward_m=-10.0, right_m=5.0, up_m=0.0, zoom=0.5),
-        PovConfig(id=2, forward_m=-20.0, right_m=-5.0, up_m=3.0, zoom=0.0),
+        PovConfig(id=1, depth_m=-10.0, horizontal_m=5.0, vertical_m=0.0, zoom=0.5),
+        PovConfig(id=2, depth_m=-20.0, horizontal_m=-5.0, vertical_m=3.0, zoom=0.0),
     ]
 
 
@@ -163,7 +163,7 @@ def test_configured_povs_negate_backward_into_forward(cfg_default):
 
 def test_explicit_povs_take_precedence(cfg_random_enabled):
     """povs= wins even when random is enabled in TOML."""
-    explicit = [PovConfig(id=42, forward_m=-1.0)]
+    explicit = [PovConfig(id=42, depth_m=-1.0)]
     d = DataCollector(povs=explicit)
     assert d._povs is explicit
 
@@ -236,17 +236,17 @@ def test_random_zoom_range_omitted_falls_back_to_zero(cfg_random_no_zoom):
 def test_random_ranges_propagate_from_toml(cfg_random_enabled):
     """Generated POVs respect the TOML ranges, not just the requested count.
 
-    Confirms collect wires backward/right/up/zoom ranges through to the
-    generator (backward_m is negated into forward_m).
+    Confirms collect wires depth/horizontal/vertical/zoom ranges through to the
+    generator (depth_m is negated into the internal depth_m).
     """
     import random
 
     random.seed(2024)
     d = DataCollector()
     for p in d._povs_for_sample():
-        assert -400.0 <= p.forward_m <= -10.0  # backward_m_range [10, 400] negated
-        assert -50.0 <= p.right_m <= 50.0       # right_m_range
-        assert 0.0 <= p.up_m <= 100.0           # up_m_range
+        assert -400.0 <= p.depth_m <= -10.0     # depth_range_m [10, 400] negated
+        assert -50.0 <= p.horizontal_m <= 50.0  # horizontal_range_m
+        assert 0.0 <= p.vertical_m <= 100.0     # vertical_range_m
         assert 0.0 <= p.zoom <= 1.0             # zoom_range
 
 
@@ -262,7 +262,7 @@ def test_random_missing_num_povs_raises_key_error(monkeypatch, tmp_path):
 def test_random_missing_range_raises_key_error(monkeypatch, tmp_path):
     """enabled=true but a required *_range key absent -> KeyError."""
     toml_text = FIXTURE_TOML_RANDOM_ENABLED.replace(
-        "backward_m_range = [10.0, 400.0]\n", ""
+        "depth_range_m = [10.0, 400.0]\n", ""
     )
     _install_config(monkeypatch, tmp_path, toml_text)
     d = DataCollector()
