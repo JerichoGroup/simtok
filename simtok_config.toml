@@ -16,8 +16,8 @@ usd_path = "usd/maps/scenes/cube.usda"
 # =============================================================================
 
 [collect]
-num_samples = 2
-video_duration_sec = 3
+num_samples = 100
+video_duration_sec = 60
 video_fps = 20
 initial_scene_load_time_sec = 5
 camera_settle_time_sec = 2
