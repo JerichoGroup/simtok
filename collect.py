@@ -284,12 +284,9 @@ class DataCollector:
             look_at_target=True, duration_s=0, turn_duration_s=0
         )
 
-        if pov.depth_m:
-            camera.move_forward_backward(pov.depth_m, duration_s=0)
-        if pov.horizontal_m:
-            camera.move_right_left(pov.horizontal_m, duration_s=0)
-        if pov.vertical_m:
-            camera.move_up_down(pov.vertical_m, duration_s=0)
+        camera.move_forward_backward(pov.depth_m, duration_s=0)
+        camera.move_right_left(pov.horizontal_m, duration_s=0)
+        camera.move_up_down(pov.vertical_m, duration_s=0)
 
         camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt, 0)
 
