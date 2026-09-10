@@ -220,12 +220,11 @@ class UdpBot(BaseUDPSender):
         aerial_dist = math.sqrt(dx * dx + dy * dy)
         pitch_r = math.atan2(dz, aerial_dist)
 
-        self._turn_to(
-            math.degrees(self._current_world_roll_r),
-            math.degrees(pitch_r),
-            math.degrees(yaw_r),
-            duration_s
-        )
+        target_yaw_d = math.degrees(yaw_r)
+        current_yaw_d = math.degrees(self._current_world_yaw_r)
+
+        self.turn_pitch(math.degrees(pitch_r), duration_s=duration_s)
+        self.turn_yaw(target_yaw_d - current_yaw_d, duration_s=duration_s)
 
     def move_to_point(self, target_lat: float, target_lon: float, target_alt: float,
                       target_roll_d: float, target_pitch_d: float, target_yaw_d: float,

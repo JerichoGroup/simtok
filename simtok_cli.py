@@ -48,6 +48,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--usd-path", type=str, default=None,
         help="USD scene file path (overrides TOML).",
     )
+    collect_parser.add_argument(
+        "--random", action=argparse.BooleanOptionalAction, default=None,
+        help="Generate random POVs instead of the configured list (overrides TOML).",
+    )
 
     # --- noise ---
     noise_parser = sub.add_parser(
@@ -90,6 +94,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--usd-path", type=str, default=None,
         help="USD scene file path (overrides TOML).",
     )
+    run_all_parser.add_argument(
+        "--random", action=argparse.BooleanOptionalAction, default=None,
+        help="Generate random POVs instead of the configured list (overrides TOML).",
+    )
 
     return parser
 
@@ -102,6 +110,7 @@ def _cmd_collect(args: argparse.Namespace) -> None:
         video_duration_sec=args.duration,
         data_root=args.data_root,
         usd_path=args.usd_path,
+        use_random_povs=args.random,
     )
     collector.run()
 
@@ -133,6 +142,7 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
         video_duration_sec=args.duration,
         data_root=args.data_root,
         usd_path=args.usd_path,
+        use_random_povs=args.random,
     )
     collector.run()
 
