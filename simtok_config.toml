@@ -16,12 +16,19 @@ usd_path = "usd/maps/scenes/cube.usda"
 # =============================================================================
 
 [collect]
-num_samples = 1
-video_duration_sec = 3
+num_samples = 100
+video_duration_sec = 60
 video_fps = 20
 initial_scene_load_time_sec = 5
 camera_settle_time_sec = 2
-vertical_move_settle_time_sec = 0.5
+
+[collect.random]
+enabled = false                 # generate random POVs instead of [[collect.povs]]
+num_povs = 3                    # how many random POVs to generate
+depth_range_m = [10.0, 400.0]       # distance behind the target (positive)
+horizontal_range_m = [-50.0, 50.0]  # lateral offset (negative = left)
+vertical_range_m = [-50.0, 50.0]    # height above the target
+zoom_range = [0.0, 1.0]             # zoom value (0.0 wide .. 1.0 tele)
 
 [collect.target]
 lat = 32.12345
@@ -29,25 +36,31 @@ lon = 35.12345
 alt = 0.0
 roll = 0.0
 pitch = 0.0
-yaw = 0.0
+yaw = 90.0
 
 [[collect.povs]]
 id = 1
-lat = 32.123269
-lon = 35.1232421
-alt = 0.0
-move_up_m = 0.0
-pitch_deg = 0.0
-zoom = 0.5
+depth_m = 10.0
+horizontal_m = 25.0
+vertical_m = 0.0
+zoom = 0.0
 
 [[collect.povs]]
 id = 2
-lat = 32.12345
-lon = 35.1233561
-alt = 5.0
-move_up_m = 0.0
-pitch_deg = 0.0
+depth_m = 10.0
+horizontal_m = 0.0
+vertical_m = 25.0
 zoom = 0.0
+
+[[collect.povs]]
+id = 3
+depth_m = 10.0
+horizontal_m = 25.0
+vertical_m = 25.0
+zoom = 0.0
+
+
+
 
 # =============================================================================
 # Noise Processor
@@ -123,7 +136,7 @@ height_mm = 3.13
 
 [zoom.hfov]
 wide_deg = 65.0                 # at zoom = 0.0
-tele_deg = 7.2                  # at zoom = 1.0
+tele_deg = 3.2                  # at zoom = 1.0
 
 [zoom.slew]
 duration_sec = 4.0

@@ -33,11 +33,9 @@ class PovConfig:
     """Store a single camera point-of-view configuration."""
 
     id: int
-    lat: float
-    lon: float
-    alt: float
-    move_up_m: float = 0.0
-    pitch_deg: float = 0.0
+    depth_m: float = 0.0
+    horizontal_m: float = 0.0
+    vertical_m: float = 0.0
     zoom: float = 0.0
 
 
@@ -52,28 +50,49 @@ class DataCollector:
         video_fps: Optional[int] = None,
         data_root: Optional[Path] = None,
         usd_path: Optional[str] = None,
+        use_random_povs: Optional[bool] = None,
         povs: Optional[list[PovConfig]] = None,
     ) -> None:
         """Initialize the collector, prioritizing explicit args over TOML config."""
         config = get_config()
-        paths = config.paths
+
+        self._resolve_run_params(config, num_samples, video_duration_sec, video_fps, usd_path)
+        self._build_output_dirs(config, data_root)
+        self._unpack_target(config.collect_target)
+        self._create_povs(config, use_random_povs, povs)
+
+    # ------------------------------------------------------------------
+    # Initialization helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_run_params(
+        self,
+        config,
+        num_samples: Optional[int],
+        video_duration_sec: Optional[int],
+        video_fps: Optional[int],
+        usd_path: Optional[str],
+    ) -> None:
+        """Resolve scalar run parameters, preferring explicit args over TOML."""
         collect = config.collect
-        target = config.collect_target
 
         self._num_samples: int = num_samples if num_samples is not None else collect["num_samples"]
         self._video_duration_sec: int = video_duration_sec if video_duration_sec is not None else collect["video_duration_sec"]
         self._video_fps: int = video_fps if video_fps is not None else collect["video_fps"]
-        self._usd_path: str = usd_path if usd_path is not None else paths["usd_path"]
+        self._usd_path: str = usd_path if usd_path is not None else config.paths["usd_path"]
 
         self._initial_scene_load_time_sec: int = collect["initial_scene_load_time_sec"]
         self._camera_settle_time_sec: int = collect["camera_settle_time_sec"]
-        self._vertical_move_settle_time_sec: float = collect["vertical_move_settle_time_sec"]
 
-        root = Path(data_root) if data_root is not None else Path(paths["data_root"])
+    def _build_output_dirs(self, config, data_root: Optional[Path]) -> None:
+        """Derive the video/pose/bbox output directories from the data root."""
+        root = Path(data_root) if data_root is not None else Path(config.paths["data_root"])
         self._video_dir: Path = root / "videos"
         self._pose_dir: Path = root / "poses"
         self._bbox_dir: Path = root / "bboxes"
 
+    def _unpack_target(self, target: dict) -> None:
+        """Unpack the target location and default orientation."""
         self._target_lat: float = target["lat"]
         self._target_lon: float = target["lon"]
         self._target_alt: float = target["alt"]
@@ -81,21 +100,88 @@ class DataCollector:
         self._default_pitch: float = target["pitch"]
         self._default_yaw: float = target["yaw"]
 
+    def _create_povs(
+        self,
+        config,
+        use_random_povs: Optional[bool],
+        povs: Optional[list[PovConfig]],
+    ) -> None:
+        """Determine how POVs are produced for the run and store the mode.
+
+        Sets:
+          - self._use_random: whether POVs are regenerated randomly per sample.
+          - self._random_cfg: the [collect.random] config used for regeneration.
+          - self._povs: the fixed POV list for the explicit/configured paths
+            (unused when self._use_random is True, where POVs are drawn fresh
+            for each sample).
+
+        Precedence: an explicit ``povs`` argument wins, then the random flag
+        (arg over TOML ``enabled``), else the configured [[collect.povs]] list.
+        In random mode the configured POVs are ignored entirely.
+        """
+        random_cfg = config.collect_random
+        self._random_cfg = random_cfg
+
         if povs is not None:
+            self._use_random = False
             self._povs = povs
+            return
+
+        use_random = (
+            use_random_povs
+            if use_random_povs is not None
+            else random_cfg.get("enabled", False)
+        )
+        self._use_random = bool(use_random)
+
+        if self._use_random:
+            self._povs = []
         else:
-            self._povs = [
-                PovConfig(
-                    id=pov["id"],
-                    lat=pov["lat"],
-                    lon=pov["lon"],
-                    alt=pov["alt"],
-                    move_up_m=pov.get("move_up_m", 0.0),
-                    pitch_deg=pov.get("pitch_deg", 0.0),
-                    zoom=pov.get("zoom", 0.0),
-                )
-                for pov in config.collect_povs
-            ]
+            self._povs = self._load_configured_povs(config.collect_povs)
+
+    def _get_sample_povs(self) -> list[PovConfig]:
+        """Return the POVs to use for one sample.
+
+        In random mode a fresh list of random POVs is generated for every
+        sample (ids 1..num_povs). Otherwise the fixed configured/explicit
+        list is reused across all samples.
+        """
+        if self._use_random:
+            return self._generate_random_povs(self._random_cfg)
+        return self._povs
+
+    @staticmethod
+    def _load_configured_povs(pov_entries: list[dict]) -> list[PovConfig]:
+        """Build a list of POVs from the [[collect.povs]] config entries.
+
+        The config expresses depth as a positive "behind the target" distance;
+        it is negated into the internal depth_m so that depth_m < 0 places the
+        camera behind the target (the convention used elsewhere).
+        """
+        return [
+            PovConfig(
+                id=pov["id"],
+                depth_m=-pov.get("depth_m", 0.0),
+                horizontal_m=pov.get("horizontal_m", 0.0),
+                vertical_m=pov.get("vertical_m", 0.0),
+                zoom=pov.get("zoom", 0.0),
+            )
+            for pov in pov_entries
+        ]
+
+    @staticmethod
+    def _generate_random_povs(random_cfg: dict) -> list[PovConfig]:
+        """Build a list of random POVs from the [collect.random] config."""
+        # Imported lazily to avoid a circular import (random_povs imports PovConfig).
+        from random_povs import RandomPovGenerator
+
+        generator = RandomPovGenerator(
+            x_range=tuple(random_cfg["depth_range_m"]),
+            y_range=tuple(random_cfg["horizontal_range_m"]),
+            z_range=tuple(random_cfg["vertical_range_m"]),
+            zoom_range=tuple(random_cfg.get("zoom_range", (0.0, 0.0))),
+        )
+        return generator.generate(random_cfg["num_povs"])
 
     # ------------------------------------------------------------------
     # Public API
@@ -179,20 +265,30 @@ class DataCollector:
         return f"sample_{sample_id:03d}_pov_{pov.id}"
 
     def _move_camera(self, camera: UdpBot, pov: PovConfig, zoom_commander: ZoomCommander) -> None:
-        """Move the camera to the given POV and orient it toward the target."""
+        """Move the camera to the given POV and orient it toward the target.
+
+        Start co-located with the target using the default orientation, then
+        displace by the POV's relative offsets while keeping that orientation
+        fixed, then turn to look back at the target. Relative moves are
+        immediate (duration_s=0).
+
+        The reset uses look_at_target=True with turn_duration_s=0 so that
+        move_to_point's trailing _turn_to() restores the camera to the default
+        orientation (yaw) before the relative moves. Without this the camera
+        would retain the heading left by the previous POV's turn_to_point, and
+        the yaw-dependent forward/right moves would accumulate rotation error.
+        """
         camera.move_to_point(
-            pov.lat, pov.lon, pov.alt,
+            self._target_lat, self._target_lon, self._target_alt,
             self._default_roll, self._default_pitch, self._default_yaw,
-            look_at_target=False, duration_s= 0, turn_duration_s= 0
+            look_at_target=True, duration_s=0, turn_duration_s=0
         )
-        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt)
 
-        if pov.move_up_m:
-            camera.move_up_down(pov.move_up_m)
-            sleep(self._vertical_move_settle_time_sec)
+        camera.move_forward_backward(pov.depth_m, duration_s=0)
+        camera.move_right_left(pov.horizontal_m, duration_s=0)
+        camera.move_up_down(pov.vertical_m, duration_s=0)
 
-        if pov.pitch_deg:
-            camera.turn_pitch(pov.pitch_deg)
+        camera.turn_to_point(self._target_lat, self._target_lon, self._target_alt, 0)
 
         zoom_commander.set_zoom(pov.zoom)
 
@@ -254,7 +350,7 @@ class DataCollector:
 
             self._publish_oscillation(new_pub)
 
-            for pov in self._povs:
+            for pov in self._get_sample_povs():
                 self._capture_sample_from_pov(
                     sample_id, pov, camera, video, pose, bbox, reset_pub, zoom_commander
                 )

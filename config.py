@@ -34,6 +34,7 @@ class SimtokConfig:
         section = dict(self._data.get("collect", {}))
         section.pop("target", None)
         section.pop("povs", None)
+        section.pop("random", None)
         return section
 
     @property
@@ -45,6 +46,11 @@ class SimtokConfig:
     def collect_povs(self) -> list[Dict[str, Any]]:
         """Return the [[collect.povs]] array of tables."""
         return list(self._data.get("collect", {}).get("povs", []))
+
+    @property
+    def collect_random(self) -> Dict[str, Any]:
+        """Return the [collect.random] section."""
+        return dict(self._data.get("collect", {}).get("random", {}))
 
     @property
     def noise(self) -> Dict[str, Any]:
